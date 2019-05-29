@@ -1,6 +1,6 @@
 # Testing Scientific Code
 
-A method for testing code that has equations.\ 
+A method for testing code that has equations.<br/>
 by Drew Dolgert
 
 This is a set of methods for testing scientific software.
@@ -12,9 +12,8 @@ of various approaches specific to more mathematical
 algorithms.
 
 1. [Software Testing Mitigates Risk](basic.md)
-2. A Model of Scientific Software Structure
-3. Testing Parameter Logic
-4. Testing Data Movement
-5. Simplification and Approximation of Mathematical Functions
-6. Common Statistical Tests
-7. Using Symmetry to Test a Function
+2. Testing Parameter Logic
+3. Testing Data Movement
+4. Simplification and Approximation of Mathematical Functions
+5. Common Statistical Tests
+6. Using Symmetry to Test a Function
