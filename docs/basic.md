@@ -1,5 +1,3 @@
-# Software Testing Mitigates Risk
-
 The first job of a software developer is to estimate risk.<sup>1</sup>
 We test parts of the code for their highest risks, and we test
 the riskiest parts of the code the most.
