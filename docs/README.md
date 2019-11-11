@@ -11,9 +11,9 @@ code to make it easier to test. There are also reminders
 of various approaches specific to more mathematical
 algorithms.
 
-1. [Software Testing Mitigates Risk](basic.md)
-2. Testing Parameter Logic
-3. Testing Data Movement
-4. Simplification and Approximation of Mathematical Functions
-5. Common Statistical Tests
-6. Using Symmetry to Test a Function
+* [Software Testing Mitigates Risk](basic.md)
+* Testing Parameter Logic
+* Testing Data Movement
+* Simplification and Approximation of Mathematical Functions
+* Common Statistical Tests
+* Using Symmetry to Test a Function

@@ -10,6 +10,21 @@
      and what you do. Show movement-algorithm-movement.
 
   d. Apply these to reduce risk.
+     The value of unit testing is that it makes you write units.
+
+
+1. Faults in Mathematical Code
+
+  * Feature-fault-failure
+
+  * Classes of errors.
+     * off-by-one index
+     * equation wrong in functional form
+     * NaN, Inf mishandling
+     * for-loop limit problem
+     * if-then conditional test wrong
+
+  * computational complexity versus arithmetic complexity
 
 
 2. Testing parameter logic
@@ -38,21 +53,67 @@
   d. Trusting movement lets you reuse code.
 
 
-4. Brute force numerical algorithms for comparison
+3. Testing Numbers
 
-  a. Not having an oracle for most of the solutions is a problem.
+  * When does a == b for IEEE?
+    * What's small enough for a single or double?
+    * It depends on the number of calculations for drift.
 
-  b. Can we find a limiting answer or something related?
+  * Vectors are lots of numbers.
+    * A bunch of parameters. A large space.
+    * Nondecreasing, one-hump, categorical measures.
 
-  c. Calculus techniques are powerful here.
+  * Stratify tests for run time
 
-     1. limits
+    * cheap, fast on box.
+    * long on push to repo.
 
-     2. numerical integration
-     
-     3. numerical derivatives
-  
-  d. There are a lot of techniques that would be slow but are useful.
+
+3. Compare with limiting theory
+
+   * Large-N limit
+     * How you calculate what a sequence of values approaches.
+
+   * Limiting parameter value (infinity or zero)
+
+     * Taylor series
+     * Limits at infinity and zero
+
+   * Simpler simulations (random walker). testing a metric on a value.
+
+   * Categorical behavior
+
+      * Moves in the right direction when perturbed.
+      * Rock in the pond to test axis usage.
+      * one-hump or two.
+
+3. Parallel Implementation
+
+  * Brute force numerical algorithms for comparison
+
+    a. Not having an oracle for most of the solutions is a problem.
+
+    b. Can we find a limiting answer or something related?
+
+    c. Calculus techniques are powerful here.
+
+       1. limits
+
+       2. numerical integration
+       
+       3. numerical derivatives
+    
+    d. There are a lot of techniques that would be slow but are useful.
+
+  * Micro-macro and macro-micro
+
+  * Think of invariants, not algorithms. Relate x+1 to x.
+
+  * Another language or library
+
+  * A figure in a paper
+
+  * Compare with your former answer, for refactoring
 
 
 5. Common Statistical Tests
@@ -61,7 +122,13 @@
 
   b. Use statistics in your tests.
 
-  c. Find bounds and measure them statistically. Fix seeds.
+  c. Find bounds and measure them statistically.
+
+    * Fix seeds.
+
+    * Look for determinism, eg. ordering from hash in a dictionary.
+
+    * Empirical distributions.
 
   d. It's not foolproof to run 20 tests, but no test is foolproof.
 
@@ -73,9 +140,14 @@
   b. You have equations, though, and you can use what you do know.
 
   c. Metamorphic testing can catch a lot.
+     * p goes to 1-p.
+     * reverse of elements
+     * linear in input is linear in output
 
   d. Knowing symmetries will also help optimization.
 
+6. Random changes to the code.
+   * Tests unit tests.
 
 7. Outside the code
 
