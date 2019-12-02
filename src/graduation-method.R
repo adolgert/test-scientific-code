@@ -1,3 +1,30 @@
+mean_age_naive <- function(mx, nx) {
+  expx <- exp(-mx * nx)
+  (1 / mx) - (nx * expx) / (1 - expx)
+}
+
+
+#' Plots a demonstration of failure of naive method.
+#' 
+#' Call with plot_mean_age_naive_low_values(5, 7, 1)
+plot_mean_age_naive_low_values <- function(high, low, age_width) {
+  mx <- 10**(-(seq(high, low, 0.02)))
+  nx <- rep(age_width, length(mx))
+  ax <- mean_age_naive(mx, nx)
+  plot(log10(mx), ax)
+}
+
+
+#' Plots a demonstration correction.
+#' 
+#' Call with plot_mean_age_naive_low_values(5, 7, 1)
+plot_constant_mortality_mean_age <- function(high, low, age_width) {
+  mx <- 10**(-(seq(high, low, 0.02)))
+  nx <- rep(age_width, length(mx))
+  ax <- constant_mortality_mean_age(mx, nx)
+  plot(log10(mx), ax)
+}
+
 #' Given mortality, calculate mean age of death.
 #' 
 #' This assumes the mortality rate is constant
@@ -11,8 +38,8 @@
 #' @param nx Width of each interval, in years.
 #' @return Mean age of death within the interval.
 constant_mortality_mean_age <- function(mx, nx) {
-  lower_bound = 1e-8  # Taylor expansion below this.
-  upper_bound = 1e-7  # regular calculation above this.
+  lower_bound = 3e-6  # Taylor expansion below this.
+  upper_bound = 1e-5  # regular calculation above this.
   low <- mx <= upper_bound
   high <- mx >= lower_bound
 
@@ -26,14 +53,15 @@ constant_mortality_mean_age <- function(mx, nx) {
   # Do the version where mx is large enough.
   nxh <- nx[high]
   mxh <- mx[high]
-  expx <- exp(mxh * nxh)
+  expx <- exp(-mxh * nxh)
   axh[high] <- (1 / mxh) - (nxh * expx) / (1 - expx)
   
   nxl <- nx[low]
-  mxl <- nx[low]
-  # a_x = \frac{n}{2} - \frac{n^2m}{12} + \frac{n^4m^3}{720}
-  axl[low] <- nxl * (0.5 + nxl * (-mxl / 12 + mxl**3 * nxl**2 / 720))
-
+  mn <- mx[low] * nx[low]
+  # a_x = n/2 - m n^2 / 12 + m^3 n^4 / 720 - m^5 n^6/30240
+  axl[low] <- (nxl / 2) * (1 - mn / 6 + mn**3 / 360)
+  #axl[low] <- (nxl / 2) * (1 - mn / 6 * (1 - mn**2 / 60))
+  
   ax[low] <- axl[low]
   ax[high] <- axh[high]
   ax[mid] <- (1 - mid_fraction) * axl[mid] + mid_fraction * axh[mid]
