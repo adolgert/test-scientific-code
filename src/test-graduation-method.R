@@ -49,3 +49,63 @@ test_that("constant_mortality_mean_age scales with a, mx, n", {
   ax <- constant_mortality_mean_age(mx, nx)
   expect(max(abs(ax * mx - ax[1] * mx[1])) < 1e-7)
 })
+
+
+test_that("mean_age_from_interpolation matches exact value", {
+  nx = rep(1, 50)
+  x = c(0, cumsum(nx))
+  mx = rep(0.01, 50)
+  lx = exp(-mx * x[1:50])
+  lx_integrated = (exp(-mx * x[1:50]) - exp(-mx * x[2:51])) / mx
+  ax <- mean_age_from_interpolation(lx, lx_integrated, nx)
+  constant_ax <- constant_mortality_mean_age(mx, nx)
+  expect(max(abs(ax - constant_ax) / constant_ax) < 1e-4)
+})
+
+
+test_that("population_from_survival for no death", {
+  px <- rep(1, 10)
+  survive <- population_from_survival(px, l0 = 1)
+  expect_equal(length(survive), 10)
+  expect(max(abs(survive - 1)) < 1e-8)
+})
+
+
+test_that("population_from_survival l0 changes it", {
+  px <- c(.9, .8)
+  survive <- population_from_survival(px, l0 = 7)
+  expect_equal(survive[1], 7)
+  expect_lt(survive[2], 7)
+})
+
+
+test_that("population_from_survival matches by-hand", {
+  px <- c(0.9, .85, 0.7)
+  survive <- population_from_survival(px)
+  expect(abs(survive[3] - 0.9 * 0.85) < 1e-7)
+})
+
+
+test_that("interpolate_integral works for a horizontal line", {
+  lx <- rep(3, 5)
+  nx <- c(0.1, 1, 2.4, 6, 7)
+  lx_integrated <- interpolate_integral(lx, nx)
+  expect_equal(length(lx_integrated), length(lx))
+  expected <- lx * nx
+  # Check all but last because it is forced to zero at end.
+  expect(max(abs(lx_integrated[1:length(lx) - 1] - expected[1:length(lx) - 1])) < 1e-5,
+         "integral of constant value isn't constant")
+})
+
+
+test_that("interpolate_integral works for a descending line", {
+  x <- seq(0, 50, 5)
+  nx <- x[2:length(x)] - x[1:length(x) - 1]
+  lx <- (-x[1:length(nx)] / 50 + 1)
+  expected <- -(1 / 100) * ((x[1:length(lx)] + nx)**2 - x[1:length(lx)]**2) + nx
+  lx_integrated <- interpolate_integral(lx, nx)
+  cat(expected)
+  expect_equal(length(lx_integrated), length(lx))
+  expect(max(abs(lx_integrated - expected)) < 1e-5,
+         "integral of descending line didn't work")
+})

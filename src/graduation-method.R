@@ -66,9 +66,9 @@ constant_mortality_mean_age <- function(mx, nx) {
   mid <- low & high  # Interpolate between the two.
   mid_fraction <- (mx[mid] - lower_bound) / (upper_bound - lower_bound)
   
-  ax <- vector(mode="numeric", length = length(nx))
-  axl <- vector(mode="numeric", length = length(nx))
-  axh <- vector(mode="numeric", length = length(nx))
+  ax <- vector(mode = "numeric", length = length(nx))
+  axl <- vector(mode = "numeric", length = length(nx))
+  axh <- vector(mode = "numeric", length = length(nx))
   
   # Do the version where mx is large enough.
   nxh <- nx[high]
@@ -101,8 +101,8 @@ constant_mortality_mean_age <- function(mx, nx) {
 #' @return Mean age of death in each age range.
 mean_age_from_interpolation <- function(lx, lx_integrated, nx) {
   l = length(nx)
-  (lx_integrated[1:(l-1)] - nx[1:(l-1)] * lx[2:l]) /
-    (lx[1:(l-1)] - lx[2:l])
+  (lx_integrated[1:(l - 1)] - nx[1:(l - 1)] * lx[2:l]) /
+    (lx[1:(l - 1)] - lx[2:l])
 }
 
 
@@ -154,7 +154,8 @@ population_from_survival <- function(px, l0=1) {
 graduate_mean_age <- function(mx, nx, interpolation_method, max_error=1e-9) {
   ax <- constant_mortality_mean_age(mx, nx)
   for (iteration_idx in 1:20) {
-    lx <- population_from_mortality_rate(mx, ax, nx, 1)
+    px <- survival_from_mortality_rate(mx, ax, nx)
+    lx <- population_from_survival(px)
     lx_integrated <- interpolation_method(lx, nx)
     ax_next <- mean_age_from_interpolation(lx, lx_integrated, nx)
     if (max(abs(ax_next - ax)) < max_error) {
@@ -180,17 +181,54 @@ interpolate_integral <- function(lx, nx) {
   x <- c(0, cumsum(nx))
   y <- c(lx, 0)
   # The returned function can do derivatives but not integrals.
-  interpolation <- splinefun(x, y, method="hyman")
+  interpolation <- splinefun(x, y, method = "hyman")
   # We pull out its function environment in order to
   # get the coefficients that it saved.
   interp_environment <- rlang::fn_env(interpolation)
   n <- length(nx)
-  coefficients <- interp_environment$z[1:n]
+  coefficients <- interp_environment$z
   # a + b*x + c*x^2 + d*x^3
-  a <- coefficients$y
-  b <- coefficients$b
-  c <- coefficients$c
-  d <- coefficients$d
-  # Then integrate by hand, in Horner form.
-  (((((d / 4) * nx + c / 3) * nx + b / 2) * nx) + a) * nx
+  a <- coefficients$y[1:n]
+  b <- coefficients$b[1:n]
+  c <- coefficients$c[1:n]
+  d <- coefficients$d[1:n]
+  x0 <- x[1:n]
+  xn <- x[2:(n + 1)]
+  # Integrate
+  a * nx + (b / 2) * nx**2 + (c / 3) * nx**3 + (d / 4) * nx**4
+}
+
+
+interp_catch <- function() {
+  x <- seq(0, 55, 5)
+nx <- x[2:length(x)] - x[1:(length(x) - 1)]
+lx <- (-x[1:length(nx)] / 50 + 1)
+expected <- -(1 / 100) * ((x[1:length(lx)] + nx)**2 - x[1:length(lx)]**2) + nx
+found <- interpolate_integral(lx, nx)
+}
+
+interp_plot <- function() {
+  x <- seq(0, 50, 5)
+  nx <- x[2:length(x)] - x[1:(length(x) - 1)]
+  lx <- (-x[1:length(nx)] / 50 + 1)
+  expected <- -(1 / 100) * ((x[1:length(lx)] + nx)**2 - x[1:length(lx)]**2) + nx
+  interpolation <- splinefun(x[1:length(lx)], lx, method = "hyman")
+  
+  interp_environment <- rlang::fn_env(interpolation)
+  n <- length(nx)
+  coefficients <- interp_environment$z
+  # a + b*x + c*x^2 + d*x^3
+  a <- coefficients$y[1:n]
+  b <- coefficients$b[1:n]
+  c <- coefficients$c[1:n]
+  d <- coefficients$d[1:n]
+  x0 <- x[1:n]
+  xn <- x[2:(n + 1)]
+  cat(paste0("b=", b))
+  cat(paste0("c=", c))
+  cat(paste0("d=", d))
+  cat(paste0("dx=", xn - x0))
+  plot(x[1:length(lx)], lx)
+  lines(x, interpolation(x), col = "green")
+  points(x[1:length(a)], a, col = "blue")
 }
