@@ -17,11 +17,24 @@ test_that("constant_mortality_mean_age gets larger with larger n for small mx", 
 
 
 test_that("constant_mortality_mean_age within bounds of nx", {
-  mx <- 10**(-(5 + 4 * runif(12)))
+  mx <- 10**(-(5 + 4 * runif(1000)))
   nx <- rep(1, length(mx)) * c(1/365, 1/12, 1, 5)
   ax <- constant_mortality_mean_age(mx, nx)
   expect(all(ax > 0))
   expect(all(ax < nx / 2))
+})
+
+
+test_that("constant_mortality_mean_age goes to 0 for large mx", {
+  ax <- constant_mortality_mean_age(100, 1)
+  expect_lt(1e-6, ax)
+})
+
+
+test_that("constant_mortality_mean_age goes to 1/2 for small mx", {
+  ax <- constant_mortality_mean_age(0, 1)
+  expect_lt(abs(1/2 - ax), 1e-9)
+  expect_gte(1/2 - ax, 0)
 })
 
 

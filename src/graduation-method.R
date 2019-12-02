@@ -3,15 +3,33 @@ mean_age_naive <- function(mx, nx) {
   (1 / mx) - (nx * expx) / (1 - expx)
 }
 
+mean_age_taylor <- function(mx, nx) {
+  mn <- mx * nx
+  (nx / 2) * (1 - mn / 6 * (1 - mn**2 / 60))
+}
+
+
+#' Pade approximant to the mean age
+#' 
+#' This isn't any better than the Taylor series.
+mean_age_pade <- function(mx, nx) {
+  mn <- mx * nx
+  nx * (1 / 2 - mn / 3 + 3 * mn**2 / 24) / (1 - mn / 2 + mn**2 / 6 - mn**3 / 24)
+}
+
 
 #' Plots a demonstration of failure of naive method.
 #' 
-#' Call with plot_mean_age_naive_low_values(5, 7, 1)
+#' Call with plot_mean_age_naive_low_values(-3, 7, 1)
 plot_mean_age_naive_low_values <- function(high, low, age_width) {
   mx <- 10**(-(seq(high, low, 0.02)))
   nx <- rep(age_width, length(mx))
-  ax <- mean_age_naive(mx, nx)
-  plot(log10(mx), ax)
+  ax1 <- mean_age_naive(mx, nx)
+  plot(log10(mx), ax1, col = "black", pch = 8)
+  ax3 <- mean_age_taylor(mx, nx)
+  points(log10(mx), ax3, col = "blue")
+  ax4 <- mean_age_pade(mx, nx)
+  points(log10(mx), ax4, col = "green")
 }
 
 
@@ -38,17 +56,19 @@ plot_constant_mortality_mean_age <- function(high, low, age_width) {
 #' @param nx Width of each interval, in years.
 #' @return Mean age of death within the interval.
 constant_mortality_mean_age <- function(mx, nx) {
-  lower_bound = 3e-6  # Taylor expansion below this.
-  upper_bound = 1e-5  # regular calculation above this.
+  # The low-mortality polynomial is excellent, even out to mu=1.
+  # The goal is to get a monotonic prediction even for low precision.
+  lower_bound = 1e-5  # Taylor expansion below this.
+  upper_bound = 1e-4  # regular calculation above this.
   low <- mx <= upper_bound
   high <- mx >= lower_bound
 
   mid <- low & high  # Interpolate between the two.
   mid_fraction <- (mx[mid] - lower_bound) / (upper_bound - lower_bound)
   
-  ax <- vector(mode="numeric", length=length(nx))
-  axl <- vector(mode="numeric", length=length(nx))
-  axh <- vector(mode="numeric", length=length(nx))
+  ax <- vector(mode="numeric", length = length(nx))
+  axl <- vector(mode="numeric", length = length(nx))
+  axh <- vector(mode="numeric", length = length(nx))
   
   # Do the version where mx is large enough.
   nxh <- nx[high]
@@ -59,9 +79,8 @@ constant_mortality_mean_age <- function(mx, nx) {
   nxl <- nx[low]
   mn <- mx[low] * nx[low]
   # a_x = n/2 - m n^2 / 12 + m^3 n^4 / 720 - m^5 n^6/30240
-  axl[low] <- (nxl / 2) * (1 - mn / 6 + mn**3 / 360)
-  #axl[low] <- (nxl / 2) * (1 - mn / 6 * (1 - mn**2 / 60))
-  
+  axl[low] <- (nxl / 2) * (1 - mn / 6 * (1 - mn**2 / 60))
+
   ax[low] <- axl[low]
   ax[high] <- axh[high]
   ax[mid] <- (1 - mid_fraction) * axl[mid] + mid_fraction * axh[mid]
