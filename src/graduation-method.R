@@ -157,7 +157,8 @@ graduate_mean_age <- function(mx, nx, interpolation_method, max_error=1e-9) {
     px <- survival_from_mortality_rate(mx, ax, nx)
     lx <- population_from_survival(px)
     lx_integrated <- interpolation_method(lx, nx)
-    ax_next <- mean_age_from_interpolation(lx, lx_integrated, nx)
+    # The interpolation doesn't give a value for the last mean age.
+    ax_next <- c(mean_age_from_interpolation(lx, lx_integrated, nx), ax[length(ax)])
     if (max(abs(ax_next - ax)) < max_error) {
       return(ax_next)
     }
