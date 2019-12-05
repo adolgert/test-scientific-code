@@ -160,12 +160,64 @@ graduate_mean_age <- function(mx, nx, interpolation_method, max_error=1e-9) {
     # The interpolation doesn't give a value for the last mean age.
     ax_next <- c(mean_age_from_interpolation(lx, lx_integrated, nx), ax[length(ax)])
     if (max(abs(ax_next - ax)) < max_error) {
-      return(ax_next)
+      return(list(ax = ax_next, iterations = iteration_idx))
     }
     ax <- ax_next
   }
   warning("mean age did not converge")
-  ax
+  list(ax = ax, iterations = iteration_idx)
+}
+
+
+#' Greville's original graduation method.
+#' 
+#' It's a simple cubic spline fit and should agree with the
+#' more modular one when used with a non-monotonic spline.
+graduate_mean_age_greville <- function(mx, nx, max_error=1e-9) {
+  n <- length(nx)
+  low <- 1:(n - 2)
+  mid <- 2:(n - 1)
+  high <- 3:n
+
+  ax <- constant_mortality_mean_age(mx, nx)
+  for (iteration_idx in 1:20) {
+    px <- survival_from_mortality_rate(mx, ax, nx)
+    px[px < 0] <- 0
+    px[px > 1] <- 1
+    lx <- population_from_survival(px)
+    dx <- c(lx[1:(n - 1)] - lx[2:n], lx[n])
+    ax_next = nx[mid] * (-dx[low] + 12 * dx[mid] + dx[high]) / (24 * dx[mid])
+    # The interpolation doesn't give a value for the last mean age.
+    ax_next <- c(ax[1], ax_next, ax[length(ax)])
+    cat(paste(ax_next, "\n"))
+    if (max(abs(ax_next - ax)) < max_error) {
+      return(list(ax = ax_next, iterations = iteration_idx))
+    }
+    ax <- ax_next
+  }
+  warning("mean age did not converge")
+  list(ax = ax, iterations = iteration_idx)
+}
+
+
+#' The smooth mortality rate used for graduation.
+#' 
+#' If the population is l_x, which is the survival,
+#' then hazard rate is mu = -(1/lx) * (d lx / dx).
+smooth_population <- function(mx, ax, nx) {
+  px <- survival_from_mortality_rate(mx, ax, nx)
+  lx <- population_from_survival(px)
+  x <- c(0, cumsum(nx))
+  y <- c(lx, 0)
+  # The returned function can do derivatives but not integrals.
+  splinefun(x, y, method = "monoH.FC")
+}
+
+smooth_mortality <- function(mx, ax, nx) {
+  interpolation <- smooth_population(mx, ax, nx)
+  function(x) {
+    -interpolation(x, deriv = 1) / interpolation(x)
+  }
 }
 
 
@@ -182,7 +234,7 @@ interpolate_integral <- function(lx, nx) {
   x <- c(0, cumsum(nx))
   y <- c(lx, 0)
   # The returned function can do derivatives but not integrals.
-  interpolation <- splinefun(x, y, method = "hyman")
+  interpolation <- splinefun(x, y, method = "fmm")
   # We pull out its function environment in order to
   # get the coefficients that it saved.
   interp_environment <- rlang::fn_env(interpolation)
@@ -193,8 +245,6 @@ interpolate_integral <- function(lx, nx) {
   b <- coefficients$b[1:n]
   c <- coefficients$c[1:n]
   d <- coefficients$d[1:n]
-  x0 <- x[1:n]
-  xn <- x[2:(n + 1)]
   # Integrate
   a * nx + (b / 2) * nx**2 + (c / 3) * nx**3 + (d / 4) * nx**4
 }
