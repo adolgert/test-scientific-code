@@ -253,6 +253,20 @@ interpolate_integral <- function(lx, nx) {
 }
 
 
+interpolate_integral_third_cubic <- function(lx, nx) {
+  x <- c(0, cumsum(nx))
+  y <- c(lx, 0)
+  n <- length(nx)
+  n0 <- 1:(n - 3)  # x-n
+  n1 <- 2:(n - 2)  # x
+  n2 <- 3:(n - 1)  # x+n
+  n3 <- 4:n        # x+2n
+  # n_L_x = (nx / 2) * (l_x + l_x+n) + (nx/24) * (d_x+n - d_x-n)
+  (nx[n1] / 2) * (lx[n1] + lx[n2]) +
+    (nx[n1] / 24) * (lx[n2] - lx[n3] - (lx[n0] - lx[n1]))
+}
+
+
 interp_catch <- function() {
   x <- seq(0, 55, 5)
 nx <- x[2:length(x)] - x[1:(length(x) - 1)]
