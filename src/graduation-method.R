@@ -93,12 +93,24 @@ constant_mortality_mean_age <- function(mx, nx) {
 #' This integral comes from Greville's work in the 1930s and 1940s.
 #' It converges quickly to the value for mean age of death.
 #' 
-#' @param lx Survival from birth, as a fraction of 1. Not 100,000.
-#' @param lx_integrated Integral over the age range of lx. This
+#' This equation comes from the definition of ax as the mean
+#' age of death within an interval.
+#' 
+#' $$
+#' \frac{{}_na_x / n_x) = \frac{\mbox{average lx} - \mbox{lx at end of interval}}
+#'   {\mbox{lx at beginning of interval} - \mbox{lx at end of interval}}.
+#' $$
+#'   
+#' Keyfitz shows this by partial integration of the numerator
+#' of ax in _A life table that agrees with the data I,_ JASS, (1966).
+#' 
+#' @param lx Survival from birth, $l_x$, as a fraction of 1. Not 100,000.
+#' @param lx_integrated Integral over the age range of lx,
+#'        $\int_0^nl_xdx$. This
 #'        will be an estimate using splines.
-#' @param nx The width of each age range, same length as lx and
+#' @param nx The width, $n_x$, of each age range, same length as lx and
 #'        lx_integrated.
-#' @return Mean age of death in each age range.
+#' @return Mean age of death, ${}_na_x$, in each age range.
 mean_age_from_interpolation <- function(lx, lx_integrated, nx) {
   l = length(nx)
   (lx_integrated[1:(l - 1)] - nx[1:(l - 1)] * lx[2:l]) /
@@ -142,8 +154,8 @@ population_from_survival <- function(px, l0=1) {
 #' that using a monotonic spline improves stability of this
 #' technique, so this makes that possible.
 #' 
-#' @param mx Mortality rate over each age interval.
-#' @param nx Width of each age interval.
+#' @param mx Mortality rate, ${}_nm_x$, over each age interval.
+#' @param nx Width, $n_x$ of each age interval.
 #' @param interpolation_method A function that will interpolate
 #'        surviving population and return the integral over
 #'        the population within each interval.
