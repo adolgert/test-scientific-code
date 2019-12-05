@@ -175,9 +175,12 @@ graduate_mean_age <- function(mx, nx, interpolation_method, max_error=1e-9) {
 #' more modular one when used with a non-monotonic spline.
 graduate_mean_age_greville <- function(mx, nx, max_error=1e-9) {
   n <- length(nx)
-  low <- 1:(n - 2)
-  mid <- 2:(n - 1)
-  high <- 3:n
+  # The first five-year age range is the fourth entry.
+  # The known algorithm turns the first ages into a single
+  # five-year age range. This is a bit lazy.
+  low <- 4:(n - 2)
+  mid <- 5:(n - 1)
+  high <- 6:n
 
   ax <- constant_mortality_mean_age(mx, nx)
   for (iteration_idx in 1:20) {
@@ -188,7 +191,7 @@ graduate_mean_age_greville <- function(mx, nx, max_error=1e-9) {
     dx <- c(lx[1:(n - 1)] - lx[2:n], lx[n])
     ax_next = nx[mid] * (-dx[low] + 12 * dx[mid] + dx[high]) / (24 * dx[mid])
     # The interpolation doesn't give a value for the last mean age.
-    ax_next <- c(ax[1], ax_next, ax[length(ax)])
+    ax_next <- c(ax[1:4], ax_next, ax[length(ax)])
     cat(paste(ax_next, "\n"))
     if (max(abs(ax_next - ax)) < max_error) {
       return(list(ax = ax_next, iterations = iteration_idx))
