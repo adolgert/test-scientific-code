@@ -265,6 +265,44 @@ interpolate_integral <- function(lx, nx) {
 }
 
 
+#' Cubic interpolation not considering boundaries
+#' 
+#' This is the standard cubic interpolant, the one Greville
+#' used. It assumes $y(t) = a + bt + ct^2 + dt^3$
+#' with conditons $y(-n) = l_{x-n}$, $y(0)=l_x$,
+#' $y(n)=l_{x+n}$, and $y(2n)=l_{x+2n}$.
+#' 
+#' @param lx The value of the function.
+#' @param nx The width of each x-axis interval.
+#'           Assumes these are all the same width.
+cubic_interpolation <- function(lx, nx, t) {
+  stopifnot(all(abs(nx - nx[1]) < 1e-7))
+  stopifnot(length(t) == 1)
+  x <- c(0, cumsum(nx))
+  greater_than <-(1:x)[t >= x]
+  m <- greater_than[length(greater_than)]
+
+  t <- t - x[m]
+  l_n <- lx[m - 1]
+  l <- lx[m]
+  ln <- lx[m + 1]
+  l2n <- lx[m + 2]
+  n <- lx[m]
+  (1 / (6 * n**3)) * (
+    6 * l * n**3 + 
+    n**2 * t * (
+      -3 * l - l2n + 6 * ln - 2 * l_n
+    ) +
+    3 * n * t**2 * (
+      -2 * l + ln + l_n
+    ) +
+    t**3 * (
+      3 * l + l2n - 3 * ln - l_n
+    )
+  )
+}
+
+
 interpolate_integral_third_cubic <- function(lx, nx) {
   x <- c(0, cumsum(nx))
   y <- c(lx, 0)
@@ -274,7 +312,8 @@ interpolate_integral_third_cubic <- function(lx, nx) {
   n2 <- 3:(n - 1)  # x+n
   n3 <- 4:n        # x+2n
   # n_L_x = (nx / 2) * (l_x + l_x+n) + (nx/24) * (d_x+n - d_x-n)
-  (nx[n1] / 2) * (lx[n1] + lx[n2]) +
+  answer1 <- (n / 24) * (-lx[n0] + 13 * (lx[n1] + lx[n2]) - lx[n3])
+  answer2 <- (n1 / 2) * (lx[n1] + lx[n2]) +
     (nx[n1] / 24) * (lx[n2] - lx[n3] - (lx[n0] - lx[n1]))
 }
 
