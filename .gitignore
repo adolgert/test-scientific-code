@@ -103,3 +103,12 @@ venv.bak/
 # mypy
 .mypy_cache/
 .Rproj.user
+
+# Latex
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
