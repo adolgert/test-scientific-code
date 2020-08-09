@@ -121,3 +121,27 @@ plot_rates <- function(n) {
          col = "green")
   points(log_rate, standard_error_rates(rate, n))
 }
+
+
+gg_version <- function(n) {
+  df <- data.frame(rate=10**seq(-3, 0, 0.1))
+  df["se"] <- standard_error_rates(df$rate, n)
+  p <- ggplot(df) + scale_x_log10() +
+    geom_line(mapping=aes(x=rate, y=se)) +
+    labs(title="Standard error") +
+    xlab("Probability") + ylab("Standard Error") +
+    coord_trans(limy = c(0, 0.3))
+  p
+}
+
+double <- function(n) {
+  df <- data.frame(rate=10**seq(-3, 0, 0.1))
+  df["se"] <- standard_error_rates(df$rate, n)
+  df["se2"] <- standard_error_rates_no_fix(df$rate, n)
+  ggplot(df) + scale_x_log10() +
+    geom_line(mapping=aes(x=rate, y=se)) +
+    geom_line(mapping=aes(x=rate, y=se2)) +
+    labs(title="Standard error") +
+    xlab("Probability") + ylab("Standard Error") +
+    coord_trans(limy = c(0, 0.3))
+}
