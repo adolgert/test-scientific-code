@@ -1,0 +1,40 @@
+---
+title: "Look at mortality with graduation method"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+mortality <- read.table("../data/mortality.csv", stringsAsFactors = FALSE, sep = ",", header = TRUE)
+age <- read.table("../data/ages.csv", stringsAsFactors = FALSE, sep = ",", header = TRUE)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r}
+world_all_ages <- mortality[mortality$location_id == 1, ]
+```
+There are too many ages b/c these age groups include some
+that are summaries.
+```{r}
+world <- world_all_ages[!is.na(match(world_all_ages$age_group_id, age$age_group_id)), ]
+world["nx"] <- age$age_group_years_end - age$age_group_years_start
+world[c("age_group_id", "location_id", "year_id", "sex_id", "run_id")] <- NULL
+x <- c(0, cumsum(world$nx))
+world["x"] <- x[1:(length(x) - 1)]
+ggplot(world, aes(x, mean)) + geom_step(direction = "hv")
+```
+
+Now try our graduation method.
+```{r}
+source("graduation-method.R")
+ax <- graduate_mean_age(world$mean, world$nx, interpolate_integral, max_error = 1e-4)
+```
+
