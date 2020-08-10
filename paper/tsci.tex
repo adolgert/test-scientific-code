@@ -354,8 +354,25 @@ distribution, don't have a variance.
 
 \subsubsection{Standard deviation}
 
-The standard deviation is how you know where to set your limits
-so that the tests don't fail too often.
+Assume there is a function with randomness, that produces floating-point numbers. Those results
+have some average value, but they vary around that average value.
+If we run this function a thousand times and take the
+lower value, below which 2.5\,\% of the results fall,
+and the upper value, above which 2.5\,\% of the results fall,
+then this interval is the standard deviation.
+
+For research statistics, the standard deviation is often part
+of an argument that a model of a problem is appropriate to
+the observed data. For unit testing the standard deviation
+is a rule of thumb for how often a perfectly good unit test
+will randomly fail.
+
+Given that results from a function are random, and we
+want to make some cutoff on which results are acceptable,
+we want to choose a cutoff that is informative, so it's
+close to the average good value. On the other hand, we don't
+want it to fail a lot. The standard deviation tells us
+how much we're pushing our luck in either direction.
 
 \subsubsection{Pearson coefficient}
 Let's say the output of a function is a set of $y$ values,
@@ -417,6 +434,11 @@ of code unfortunately use this convenience, creating side-effects
 for testing. Declaring a specific random number generator
 and passing it to a function gives gives control over the
 choice of random number generator and when its seed is fixed.
+
+It's also possible to greatly reduce the rate of failure
+for a statistical test, even with the same 99\,\% cutoff
+on acceptable results, if we write the test as a hierarchical
+model.
 
 Let's say we can fix the seed for a function, and for all the
 functions it calls. The point was to try a lot of runs. We
