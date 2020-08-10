@@ -277,11 +277,42 @@ even more on the particular math. Some suggestions:
 
 
 
-\section{Common Statistical Tests}\label{sec:statistical}
+\section{Statistics for Testing}\label{sec:statistical}
 
-\subsection{Statistics should give different answers each time}
+\subsection{Randomized calculations should give different answers each time}
 
-\subsection{Use Statistics in Your Tests}
+% Joint attention.
+% - Focus is a specific function.
+% - Focus is a kind of function.
+%   The function is presented to us with a question about correctness.
+% - Focus is a pile of statistical tests.
+%
+% The network.
+% - The code itself could be simulation.
+% - The code itself could be deterministic.
+% - The data could be randomly generated (by your test).
+% - When and how you run unit tests.
+
+% random gaussian elimination (nondeterministic). simulation.
+A simple Gaussian elimination can benefit from random pivoting.
+A function to sample a distribution is inherently random.
+Some functions introduce random reorderings
+so they can insist that the caller not expect a given order
+in the output. All of these perfectly useful functions
+thwart using simple lookup tables to test their output.
+
+The tests, themselves, can even be the problem. I'll check
+a life expectancy function against a corpus of life expectancies
+for every country. I'll randomly generate user input
+to see that a functions succeeds or gracefully fails.
+It's a kind of test case generation.
+
+We have on our side during testing some basic tools
+of statistics. Some, like mean square error, are ways
+to heap our uncertainty into a single, tidy number.
+Others, like a Kolmogorov-Smirnov test, are formal statistical
+tests. They take a clear side-effect of a function,
+its randomness, and tame it to measurable uncertainty.
 
 
 \subsection{Approaches}
@@ -290,25 +321,82 @@ even more on the particular math. Some suggestions:
     \includegraphics[scale=0.25]{gaussianlimits.pdf}
     \caption{Gaussian with limits}
     \label{fig:gaussian-limits}
-\end{figure}%
-\begin{itemize}
-  \item Confidence interval, standard deviation, variance
-  \item mean-square error
-  \item Correlation, Pearson coefficient
-  \item K-S test. Empirical distributions.
-\end{itemize}
+\end{figure}
+\subsubsection{Error estimation}
+When the function under test returns a vector of values,
+and I want to compare it with a vector of known values,
+I use an estimator, like mean-squared error, of the difference
+between the two.
+
+The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
+It takes the whole set of values and reduces it to one number I can assert must be less than some value.
+
+Even more reassuring for a unit test, I can take all of the
+sets of values and take the maximum absolute error,
+$\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
+some boundary value whose crazy-high error is hidden beneath
+low error everywhere else.
+
+\subsubsection{Variance, standard deviation}
+When there is just one vector of random numbers coming out
+of a function, it can be helpful to characterize how far
+they are from some mean value. The variance is
+the average of how far each value is from the average of all
+values, but you'd never calculate it. It's always avaiable
+as \lstinline!var! or \lstinline!variance! in any language.
+The standard deviation is the square root of this.
+
+If there's no variance, then every value in the vector is
+the same. If the variance keeps getting larger when the
+function is run again to make longer outputs, there is a
+chance that's OK. Some distributions, such as the Cauchy
+distribution, don't have a variance.
+
+\subsubsection{Standard deviation}
+
+The standard deviation is how you know where to set your limits
+so that the tests don't fail too often.
+
+\subsubsection{Pearson coefficient}
+Let's say the output of a function is a set of $y$ values,
+and the input is a set of $x$ values. You may not know
+how $y$ depends on $x$ exactly, but you know that it
+does. The Pearson coefficient is a function of
+$N$ $y$ values and $N$ $x$ values that will return a number
+between -1 and 1, where -1 is a line with a downward slope,
+1 is a line with an upward slope, and 0 means the points
+are evenly arranged so that they don't slope up or down
+and aren't collinear.
+
+For a single $y$ that depends on a single $x$, the equation
+is a few lines of code.
+\begin{equation}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})}}
+\end{equation}
+It conveniently generalizes to more dimensions.
+
+If life should be more precise than this, then the Pearson
+coefficient is maddening. But consider that it quickly
+determines whether the output rises or falls with the input,
+even in the presence of noise. It can say whether the output
+isn't linear enough, or whether it's too linear.
+
+\subsubsection{Empirical distributions, K-S test}
+
+\subsection{Random seeds}
 
 Explore with large counts and then fix the seed. If there is an error later,
 then explore again. Or leave seed free, but print it with every error
 and be able to set it.
 
-Treat the output of the function as observed data.
-Apply empirical distributions, K-S tests.
-
 Accidental determinism is an unexpected source of error for
 statistical tests. For instance, a hash-based dictionary may
 order its keys.
 
+\subsection{Tests that generate random input data}
+
+Combine the above with testing that creates random data,
+and you get tests that sometimes fail.
 
 \subsection{Conclusion}
 Not a perfect method, but pretty good.
