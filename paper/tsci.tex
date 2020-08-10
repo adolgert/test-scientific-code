@@ -277,11 +277,42 @@ even more on the particular math. Some suggestions:
 
 
 
-\section{Common Statistical Tests}\label{sec:statistical}
+\section{Statistics for Testing}\label{sec:statistical}
 
-\subsection{Statistics should give different answers each time}
+\subsection{Randomized calculations should give different answers each time}
 
-\subsection{Use Statistics in Your Tests}
+% Joint attention.
+% - Focus is a specific function.
+% - Focus is a kind of function.
+%   The function is presented to us with a question about correctness.
+% - Focus is a pile of statistical tests.
+%
+% The network.
+% - The code itself could be simulation.
+% - The code itself could be deterministic.
+% - The data could be randomly generated (by your test).
+% - When and how you run unit tests.
+
+% random gaussian elimination (nondeterministic). simulation.
+A simple Gaussian elimination can benefit from random pivoting.
+A function to sample a distribution is inherently random.
+Some functions introduce random reorderings
+so they can insist that the caller not expect a given order
+in the output. All of these perfectly useful functions
+thwart using simple lookup tables to test their output.
+
+The tests, themselves, can even be the problem. I'll check
+a life expectancy function against a corpus of life expectancies
+for every country. I'll randomly generate user input
+to see that a functions succeeds or gracefully fails.
+It's a kind of test case generation.
+
+We have on our side during testing some basic tools
+of statistics. Some, like mean square error, are ways
+to heap our uncertainty into a single, tidy number.
+Others, like a Kolmogorov-Smirnov test, are formal statistical
+tests. They take a clear side-effect of a function,
+its randomness, and tame it to measurable uncertainty.
 
 
 \subsection{Approaches}
@@ -290,29 +321,155 @@ even more on the particular math. Some suggestions:
     \includegraphics[scale=0.25]{gaussianlimits.pdf}
     \caption{Gaussian with limits}
     \label{fig:gaussian-limits}
-\end{figure}%
-\begin{itemize}
-  \item Confidence interval, standard deviation, variance
-  \item mean-square error
-  \item Correlation, Pearson coefficient
-  \item K-S test. Empirical distributions.
-\end{itemize}
+\end{figure}
+\subsubsection{Error estimation}
+When the function under test returns a vector of values,
+and I want to compare it with a vector of known values,
+I use an estimator, like mean-squared error, of the difference
+between the two.
 
-Explore with large counts and then fix the seed. If there is an error later,
-then explore again. Or leave seed free, but print it with every error
-and be able to set it.
+The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
+It takes the whole set of values and reduces it to one number I can assert must be less than some value.
 
-Treat the output of the function as observed data.
-Apply empirical distributions, K-S tests.
+Even more reassuring for a unit test, I can take all of the
+sets of values and take the maximum absolute error,
+$\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
+some boundary value whose crazy-high error is hidden beneath
+low error everywhere else.
+
+\subsubsection{Variance, standard deviation}
+When there is just one vector of random numbers coming out
+of a function, it can be helpful to characterize how far
+they are from some mean value. The variance is
+the average of how far each value is from the average of all
+values, but you'd never calculate it. It's always avaiable
+as \lstinline!var! or \lstinline!variance! in any language.
+The standard deviation is the square root of this.
+
+If there's no variance, then every value in the vector is
+the same. If the variance keeps getting larger when the
+function is run again to make longer outputs, there is a
+chance that's OK. Some distributions, such as the Cauchy
+distribution, don't have a variance.
+
+\subsubsection{Standard deviation}
+
+Assume there is a function with randomness, that produces floating-point numbers. Those results
+have some average value, but they vary around that average value.
+If we run this function a thousand times and take the
+lower value, below which 2.5\,\% of the results fall,
+and the upper value, above which 2.5\,\% of the results fall,
+then this interval is the standard deviation.
+
+For research statistics, the standard deviation is often part
+of an argument that a model of a problem is appropriate to
+the observed data. For unit testing the standard deviation
+is a rule of thumb for how often a perfectly good unit test
+will randomly fail.
+
+Given that results from a function are random, and we
+want to make some cutoff on which results are acceptable,
+we want to choose a cutoff that is informative, so it's
+close to the average good value. On the other hand, we don't
+want it to fail a lot. The standard deviation tells us
+how much we're pushing our luck in either direction.
+
+\subsubsection{Pearson coefficient}
+Let's say the output of a function is a set of $y$ values,
+and the input is a set of $x$ values. You may not know
+how $y$ depends on $x$ exactly, but you know that it
+does. The Pearson coefficient is a function of
+$N$ $y$ values and $N$ $x$ values that will return a number
+between -1 and 1, where -1 is a line with a downward slope,
+1 is a line with an upward slope, and 0 means the points
+are evenly arranged so that they don't slope up or down
+and aren't collinear.
+
+For a single $y$ that depends on a single $x$, the equation
+is a few lines of code.
+\begin{equation}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})}}
+\end{equation}
+It conveniently generalizes to more dimensions.
+
+If life should be more precise than this, then the Pearson
+coefficient is maddening. But consider that it quickly
+determines whether the output rises or falls with the input,
+even in the presence of noise. It can say whether the output
+isn't linear enough, or whether it's too linear.
+
+
+\subsection{Random seeds}
+
+I make tests with random inputs, so they explore more alternative
+paths in the code than I might guess. I run tests of random
+functions a thousand times so that they have more chances to
+show a real bug. Randomness in testing is a free source for
+finding faults and it's a constant headache.
+
+In order to use the statistical tests above, I need to choose
+a cutoff on what is a passing test and what is a failing test.
+If I choose a cutoff that's useful for finding faults, it will
+always fail for some percentage of tests. For a 95\,\% confidence
+interval, it will fail 5\,\% of the time. Even for a
+99.9\,\% confidence interval, it will fail once in a thousand
+tries. This means the green lights of a unit test display will
+be red without reason once in a thousand times, but that's
+enough not to pay attention to a red light. It's enough to
+rerun the test suite every time there is any red light.
+It's a waste of attention and time.
+
+The solution is simple. Fix the seed for the random number
+generator for each test that has randomness. The random
+seed determines the exact set of random values that will
+follow. If the test passes for a particular random seed,
+then it will always pass for reruns of the unit test until
+some fault is introduced.
+
+The simple solution is sometimes impossible and always
+disappointing. Most programming languages offer the tremendous
+convenience of calling \lstinline!rand()! anywhere in the
+code, which uses a global random number generator. Authors
+of code unfortunately use this convenience, creating side-effects
+for testing. Declaring a specific random number generator
+and passing it to a function gives gives control over the
+choice of random number generator and when its seed is fixed.
+
+It's also possible to greatly reduce the rate of failure
+for a statistical test, even with the same 99\,\% cutoff
+on acceptable results, if we write the test as a hierarchical
+model.
+
+Let's say we can fix the seed for a function, and for all the
+functions it calls. The point was to try a lot of runs. We
+can still do this by creating a unit test that is run once
+for a set of seeds, so define a starting seed and run against
+the next thousand seeds. When the test shows no real faults,
+choose a starting seed for which the next thousand all pass
+the test within some tolerance. This is less simple, but it
+explores the space of tests, and it is likely to signal when
+a real fault arrives.
 
 Accidental determinism is an unexpected source of error for
 statistical tests. For instance, a hash-based dictionary may
 order its keys.
 
-
 \subsection{Conclusion}
-Not a perfect method, but pretty good.
 
+Some kinds of unit tests are absolute. When they pass,
+there is no fault in this one path through the function.
+Statistical tests don't give that guarantee. The function
+under test could be close-enough to the desired value but
+still have a fault in some path.
+
+At the same time, statistical tests are the unit test
+equivalent of checking work with plots. They can find faults
+in places you weren't looking, because they summarize all
+of the outputs of a function, or because they summarize
+the behavior of multiple runs of a function. Testing scientific
+code is rarely (but sometimes!) an absolute assertion that
+the function has no faults, and statistical tests are an
+excellent tool in the utility belt.
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
