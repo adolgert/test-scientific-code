@@ -381,26 +381,73 @@ determines whether the output rises or falls with the input,
 even in the presence of noise. It can say whether the output
 isn't linear enough, or whether it's too linear.
 
-\subsubsection{Empirical distributions, K-S test}
 
 \subsection{Random seeds}
 
-Explore with large counts and then fix the seed. If there is an error later,
-then explore again. Or leave seed free, but print it with every error
-and be able to set it.
+I make tests with random inputs, so they explore more alternative
+paths in the code than I might guess. I run tests of random
+functions a thousand times so that they have more chances to
+show a real bug. Randomness in testing is a free source for
+finding faults and it's a constant headache.
+
+In order to use the statistical tests above, I need to choose
+a cutoff on what is a passing test and what is a failing test.
+If I choose a cutoff that's useful for finding faults, it will
+always fail for some percentage of tests. For a 95\,\% confidence
+interval, it will fail 5\,\% of the time. Even for a
+99.9\,\% confidence interval, it will fail once in a thousand
+tries. This means the green lights of a unit test display will
+be red without reason once in a thousand times, but that's
+enough not to pay attention to a red light. It's enough to
+rerun the test suite every time there is any red light.
+It's a waste of attention and time.
+
+The solution is simple. Fix the seed for the random number
+generator for each test that has randomness. The random
+seed determines the exact set of random values that will
+follow. If the test passes for a particular random seed,
+then it will always pass for reruns of the unit test until
+some fault is introduced.
+
+The simple solution is sometimes impossible and always
+disappointing. Most programming languages offer the tremendous
+convenience of calling \lstinline!rand()! anywhere in the
+code, which uses a global random number generator. Authors
+of code unfortunately use this convenience, creating side-effects
+for testing. Declaring a specific random number generator
+and passing it to a function gives gives control over the
+choice of random number generator and when its seed is fixed.
+
+Let's say we can fix the seed for a function, and for all the
+functions it calls. The point was to try a lot of runs. We
+can still do this by creating a unit test that is run once
+for a set of seeds, so define a starting seed and run against
+the next thousand seeds. When the test shows no real faults,
+choose a starting seed for which the next thousand all pass
+the test within some tolerance. This is less simple, but it
+explores the space of tests, and it is likely to signal when
+a real fault arrives.
 
 Accidental determinism is an unexpected source of error for
 statistical tests. For instance, a hash-based dictionary may
 order its keys.
 
-\subsection{Tests that generate random input data}
-
-Combine the above with testing that creates random data,
-and you get tests that sometimes fail.
-
 \subsection{Conclusion}
-Not a perfect method, but pretty good.
 
+Some kinds of unit tests are absolute. When they pass,
+there is no fault in this one path through the function.
+Statistical tests don't give that guarantee. The function
+under test could be close-enough to the desired value but
+still have a fault in some path.
+
+At the same time, statistical tests are the unit test
+equivalent of checking work with plots. They can find faults
+in places you weren't looking, because they summarize all
+of the outputs of a function, or because they summarize
+the behavior of multiple runs of a function. Testing scientific
+code is rarely (but sometimes!) an absolute assertion that
+the function has no faults, and statistical tests are an
+excellent tool in the utility belt.
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
