@@ -1191,7 +1191,7 @@ is modular in code.
 Sometimes knowing the math of a software function lets you
 test the software, even when you have an oracle problem.
 \emph{Metamorphic testing} uses the symmetry of the math function
-in order to test the correctness of the software function.
+in order to test the correctness of the software function~\cite{ding2016,guderlei2007,kanewala2015,liu2014}.
 
 The mathematical description of a function is that it relates
 a domain (input) to a range (output). We write $f(x) = y$.
@@ -1314,6 +1314,14 @@ here. You care about vectorized code and floating-point code.
 That's where the problems will be, so you can subset the test
 suite for these acceptance tests.
 
+Designating a subset of all tests as acceptance tests is an
+example of test case prioritization~\cite{rothermel1999test}.
+We prioritize tests by hand, by marking tests to be run under
+different conditions, but tests for scientific code can be lengthy,
+which makes it worth considering automatically reordering tests
+so that those that are most sensitive to correctness run by 
+themselves, or run first~\cite{yoo2012regression}.
+
 
 \section{Random changes to the code}
 The function under test, as with any block of code, can be
@@ -1355,7 +1363,40 @@ undue free time or responsibility for manned rockets.
 
 \section{Outside the code}
 
-\subsection{Team is the Larger Problem}
+\subsection{Documentation defines what a function wants to be}
+
+The section above, on parameter testing, uses a function that's a hybrid
+between Wilson's score interval and a Poisson estimator. That hybrid
+doesn't have a name, and there's no paper or Wikipedia entry for it.
+We can test that its output is a continuous function of its input
+parameters. We can test that it matches known values for limiting cases,
+but the right version of this function is the one that a team agrees
+is right.
+
+That team is usually not just the people in the room. It includes stakeholders
+outside the room. It includes reviewers. It includes future versions of the team.
+
+The tests can be a clear statement of the contract this function upholds.
+So, too, can project documents, as mentioned in the data movement section,
+where CRUD defines selection from a dataframe. Documentation isn't just
+another link in the chain of understanding. It is where the software
+developer, the one who wrote the function, states their understanding
+of the contract that function fulfills. It's the closest statement,
+in English, of what unit tests should assert.
+
+Like all other work, documentation takes time and is prioritized by
+how it addresses risk. Give the highest-level explanation first.
+This could be a reference to a paper, a book section, documentation from another library.
+Then say \emph{why} this function exists and \emph{why} it works the
+way it does.
+
+And on the technological side, equations in documentation communicate
+clearly with research-oriented readers. Similarly, code examples, run
+as unit tests themselves, within the documentation, ensure always-working
+examples for development.
+
+
+\subsection{Team is critical to tests}
 
 Take a function under test and project it onto a
 screen at the front of a meeting room. Place around that screen
@@ -1399,21 +1440,15 @@ functions will be copied into other projects, translated
 to other languages. They will exist long beyond the work
 that has your name.
 
-
-\subsection{Documentation defines what it should be}
-What equation did you intend to write? Answer that by putting math right in
-the documentation of the code. Sometimes code correctly implements an incorrect
-assumption about the math.
-
-\subsection{Attention is in short supply}
-Your mistakes can be that you fooled yourself.
-
-\subsection{Being useful gets you help}
-How do you set yourself up for external help? You write code others can run and use.
-
-\subsection{Gold standard is multiple reviewers}
-Other code, expert opinion on results from multiple disciplines.
-
+\section{Further Reading}
+\begin{itemize}
+	\item \emph{Software Testing: A Craftsman's Approach,}~\cite{jorgensen2013}.
+	\item \emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\cite{pezze2008}.
+	\item \emph{Working Effectively with Legacy Code,}~\cite{feathers2004working}.
+	\item \emph{Software Engineering for Science,}~\cite{carver2017}.
+	\item ``Testing Scientific Software: A Systematic Literature Review,''~\cite{kanewala2014}.
+	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
+	\end{itemize}
 
 \appendix
 
