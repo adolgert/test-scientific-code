@@ -1316,9 +1316,42 @@ suite for these acceptance tests.
 
 
 \section{Random changes to the code}
-\subsection{Fuzzing Inputs}
-\subsection{Mutating Code}
-Tests unit tests.
+The function under test, as with any block of code, can be
+represented as a syntax tree. This tree of operators, operands,
+and assignments, represents a contract with the compiler,
+represents the flow of information from parameters to output,
+represents a treasure map of potential faults. There is a form
+of testing that reads the function under test, creates its
+syntax tree, and randomly mutates it. It adds a one to the
+limit of a loop, and runs the unit tests again. It changes
+the order of assigment statements and tests again. Each time
+it records the change to the tree, and the outcome of the tests.
+
+When the test suite is mature, then there should be some test
+that fails for each mutation, but that isn't the case. There
+will be twenty percent of genetic mutations of the code that
+cause no test to fail, and most of those won't indicate the
+code has a fault, or even that tests are incomplete. Instead,
+these cases force a question about what choices in the code
+matter and what is irrelevant.
+
+One way to measure what matters in code is to pick a
+parameter and mark every line where its value affects
+an assignment. Then track each of those down the line.
+You'll see that only under certain conditions do certain
+parameters change a result.
+
+A similar way to understand a function is to choose central
+moments, the lines where the important math happens, and
+trace back to what affected those lines and forward to
+how those lines become the result.
+
+These are lenses into the code that clarify relationships
+among corner cases, dependence and independence from
+line-by-line choices. The lens is more important than the
+mutation technique, which should be left to those with
+undue free time or responsibility for manned rockets.
+
 
 \section{Outside the code}
 
