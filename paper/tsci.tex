@@ -1013,27 +1013,62 @@ Think of parameter-handling as translation from an external
 
 \section{Testing data movement}
 
-\subsection{Integration tests are important for science software}
+\subsection{Data movement}
 
-\subsection{Integration is Data movement}
-If the central work for the system under test is a
-long-running mathematical algorithm, there is usually some work
-to put the data into the best data structure for that algorithm
-to be efficient.
+We said earlier that there are three steps to making scientific
+software, choosing the mathematical model, discretizing that
+model, and deciding algorithms to implement the discretized model.
+Rarely is scientific software just one mathematical model
+and just one ensuing algorithm. It's a series of models supported
+by a series of algorithms.
 
-For instance, global health code works on
-hierarchies of locations, where the world is the root of the
-tree, and districts within countries are the leaves. If an algorithm
-will act on all children of a particular node in the tree,
-then it can help to sort data so that all child nodes follow
-their parents. Then data for children of a node is continuous
-in memory, increasing locality.
+For this software, as for any software, using the right algorithm
+ensures speed and scalability, and the right algorithm depends on
+its associated data structure. The relevant undergraduate class
+is called Data Structures and Algorithms, always the two together.
+As a result, performant scientific code is a series of algorithms
+joined by a series of translations from one data structure to
+another, each to support the next algorithm. The high-performance
+computing crowd calls any such code \emph{data movement,} as though
+it were excreted, but software engineers call it integration code
+and call the testing of it integration testing.
+
+\subsection{Integration testing data movement}
+
+A classic example of data movement is reorganizing a multidimensional
+array from one axis ordering to another. An algorithm with nested
+for-loops usually acts on nested axes. The order of the axes should
+put those for the inner loops last (for C and Python which are row-first), or put those
+same axes first (for R and Julia which are column-first). This so
+often controls the speed of an algorithm that it isn't considered an 
+optimization to fix it but an error to fail to set the order.
+
+More complicated an example would be translating a graph from
+an edge-list representation to an adjacency matrix representation.
+Both have their place, but the correct form depends on the
+algorithm that will act on this data.
+
+The question isn't how to test data movement. It's that data
+movement is separate from the algorithm. It should be a separate
+function and tested on its own. It has its own set of faults,
+that center around integer arithmetic, the off-by one errors,
+the loop endpoint errors. These are different in nature from
+the taxonomy of faults that plague an algorithm-in-itself,
+but they are no less debilitating to correctness.
 
 \subsection{The CRUD case}\label{sec:crud}
-From a testing standpoint, the work done during data movement
-falls into the create-read-update-delete (CRUD) categories.
-For the scientist using the code, they might understand
-descriptions such as
+
+The prosaic brother to data movement is the ubiquitous selection
+and editing of data frames we do when reading and writing data.
+The data frame, in which this data typically lives, is the
+algorithmic equivalent of a minivan, fully equipped but less
+computationally intriguing.
+
+Dataframe manipulation for loading and saving data is more a matter
+of how we want to specify a program than about moving from
+one data structure to another. There is, happily, a framework
+for recording and conveying this work, the create-read-update-delete
+(CRUD) list.
 
 \begin{itemize}
 \item \textbf{Create} - If the input data doesn't have excess mortality,
@@ -1048,9 +1083,6 @@ descriptions such as
 These are requirements. Failure to meet one of these requirements
 often won't make the code stop running. It will harm confidence
 in the code.
-
-\emph{Testing data movement is about assurance that the
-function under test meets requirements.}
 
 These tests are therefore classic boundary-value tests, where
 we try parameters at the lower boundary, upper boundary,
@@ -1145,12 +1177,13 @@ developer by writing \textsc{crud} assertions in English.
 Then we can write tests that verify these \textsc{crud} requirements for
 each of the 576 kinds of inputs. \aside{show the test}
 
-\subsection{Changing data structures}
-How to test moving data from one data structure to another.
 
 \subsection{Trust the movement}
-Trusting movement lets you reuse code.
 
+In order to test data movement separate from the main algorithm,
+we have to separate data movement from the main algorithm.
+This is one of those times that what is testable indicates what
+is modular in code.
 
 
 \section{Using symmetry to test a function}
@@ -1230,13 +1263,56 @@ a function?
 
 \section{Testing the compiler}
 
-Good compiler optimization can break good code.
-This is more true for code that uses \cpu features, such as special instruction
-sets designed for fourier transforms, video encoding, and the like. These
-special instruction sets also support mathematical libraries.
+Let's say you have a cluster of computers. They are all Intel machines,
+but they come from different years. They could be different architectures
+or just different steppings of the CPU, which is the least difference
+one can have between two chipsets. You compile code on one machine,
+or you install some R package that compiles code underneath. When
+you move to another computer on another day, that same code fails
+to run with the message, ``invalid opcode.''
 
-So make acceptance tests, the ones that run during installation, that
-verify the code works as expected.
+An opcode is a machine-language instruction. The computer you used
+yesterday knew a command that's slightly too fancy for the computer
+you're using today, and it failed. You have to clean out the code
+and recompile today. It's not that the new computer is just older.
+It's still possible that, were you to switch back, there might be
+the same message again. The history of CPU opcodes isn't a forward
+march into a larger, better set.
+
+That scenario would be annoying, and it's a headache for people
+saddled with heterogenous clusters. They solve it with, for instance,
+creating architecture-specific shared drives so that they can
+install a different version of the software for each version of
+system architecture on the cluster. That scenario is, however, a
+best case scenario.
+
+The worse scenario, and I wish this were rarer, is that the
+software runs on the other computer but gives the wrong error.
+It can fail silently. This seems like an abrogation of a compiler's
+contract with its faithful coder, but it isn't. That compiler
+ensured that the code ran well enough on one target architecture.
+The problem is that compiler optimizations at level O3, and above,
+are willing to make slightly riskier choices that yield great
+performance benefits. These choices are tuned to the architecture
+at hand, or as requested by compiler options, and, while they may
+run on similar architectures, carry more risk of error on them.
+It solves the problem of having languages
+that don't clearly represent time-saving invariants and of coders
+who can't afford motorcycles.
+
+There's a solution for this, too. Turn all optimizations down
+to O2 or lower. Or claim that the CPU uses the SSE2 instruction set.
+Unless you're intentionally commemorating the death of Phil Katz, you'll see
+this as a severe loss of performance.
+
+The last option to deal with this problem is called acceptance
+testing. It means that you create a test to run before you
+run code on a new machine. It won't do the work of creating
+a separate version of the code, if needed, but it tells you if
+you need it. You don't generally care about integer performance
+here. You care about vectorized code and floating-point code.
+That's where the problems will be, so you can subset the test
+suite for these acceptance tests.
 
 
 \section{Random changes to the code}
