@@ -1357,8 +1357,47 @@ undue free time or responsibility for manned rockets.
 
 \subsection{Team is the Larger Problem}
 
-There are two kinds of problems, how to test and the culture
-of a scientific team~\citep{neumann2016,kanewala2014}.
+Take a function under test and project it onto a
+screen at the front of a meeting room. Place around that screen
+the team you have or the team you would like to have.
+Engineering studies show that the future utility, or burden,
+of that function depends no more on its testing than it
+depends on the culture of that team~\citep{neumann2016,kanewala2014}.
+
+Culture is beyond the scope of this document, but conversations
+aren't. One point to raise in that meeting room could
+be the effect of discretization or floating point representation
+on the mathematical representation. Another could be a
+description of statistical properties of the function, a set
+of equations, beyond those to implement the function, that
+describe its expected behavior. Someone could raise an observation
+that brute force solution is suprisingly possible.
+The team could discuss likely sets of parameters that might
+matter, some determined by the math, some by logic in the
+code. A product manager could supply CRUD requirements.
+A systems engineer could describe the expected architectures
+and risk of failure due to optimization levels. Whether these
+are separate people or roles for a very few people, their
+communication gives testing the best chance at relevance.
+
+Testing well is helpful, but we saw, in the section about
+data movement, that identifying what is data movement
+and what is an algorithm meant we could label the two.
+Giving a function a good name is important to a software
+developer, but scientific code is rarely owned by a team
+of software developers. It's shared by a team of researchers.
+That team has a body of knowledge about the software, and,
+the same as any body of knowledge, it's a shared set of
+understanding where new things are added and less useful
+ideas are dropped.
+
+In this research environment, collaboration on testing
+creates commonly-understood, trusted functions. These, more
+than any single snapshot of the whole calculation, are
+what the group understands about the code. These trusted
+functions will be copied into other projects, translated
+to other languages. They will exist long beyond the work
+that has your name.
 
 
 \subsection{Documentation defines what it should be}
