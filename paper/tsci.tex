@@ -474,16 +474,34 @@ excellent tool in the utility belt.
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
 \subsection{Write it Twice}
-A federation starship relies on redundant subsystems. If you want to play
-as the federation, there here are some options for different ways to
-redo a calculation in a way that is similar to the one you want to check.
+Read through unit tests, and they all have the same form.
+Set up data and parameters to pass to a function. Call the
+function. Compare its output to some known answer, or to
+something known about the answer. Every unit test is two
+functions, the function under test and some equivalent
+calculation by the unit test itself. That equivalent calculation
+may be true only for one set of parameters. It may only
+approximate the answer within a statistically-defined region.
+It will be a hobbled mirror image of the function under test,
+unless you write it to be more.
 
-Limit how much you test.
+There are three steps to writing a function for scientific software~\citep{dahlgren2005}:
+\begin{enumerate}
+  \item Prepare discrete models.
+  \item Translate the models into algorithms.
+  \item Code the models using programming languages.
+\end{enumerate}
+The function under test made one set of assumptions during
+these stages. By rewriting that function, making a different
+set of assumptions, you test for different kinds of faults
+in the function under test.
 
-What have you tested when you compare implementations?
-More different can mean you can't explain differences.
-Too similar means you haven't tested much.
-There are three steps to scientific software~\citep{dahlgren2005}:
+The benefit, and threat to efficiency for testing, is that
+parallel implementations of a function can lead to scientific
+questions. Good unit testing strategies limit testing to the
+highest risks in the software, and that principle applies
+especially to use of parallel implementations, so let's
+look at how alternative choices probe faults in code.
 
 \begin{callout}
 \textbf{The Oracle Problem}---Sometimes
@@ -495,73 +513,135 @@ by finding simpler inputs, comparing results with another implementation,
 or checking properties of the function without checking the function itself.
 \end{callout}
 
-\begin{enumerate}
-  \item Prepare discrete models.
-  \item Translate the models into algorithms.
-  \item Code the models using programming languages.
-\end{enumerate}
-Some parallel constructions test the third. Some test 2 and 3. Some test 1, 2, 3.
 
 \subsection{Brute force numerical algorithms for comparison}
 
-\begin{enumerate}
-    \item Not having an oracle for most of the solutions is a problem.
+Let's say we are supposed to calculate the mortality rate
+for five-year age groups from birth to eighty years old,
+for a Gompertz mortality. The function under test is a formula
+from a book, once pasted as a \textsc{png} into a Jira story.
 
-    \item Can we find a limiting answer or something related?
+That function comes from the putting the Gompertz mortality
+rate into the integral for mortality,
+\begin{equation}
+  {}_nm_x = \frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(\int_{x_n}^s\mu(a)ds)ds}.
+\end{equation}
+Someone plugged the Gompertz function for $\mu(x)$ into this
+formula in order to get the equation in the book.
 
-    \item Calculus techniques are powerful here.
+We can check the code by implementing the function a second
+time, where the new version does the integrals in the equation
+above. It will be very slow by comparison, but the answer should
+be the same within $10^{-7}$ if we are working in double precision.
 
-    \begin{enumerate}
-       \item limits
+This isn't a change to the model. It's a change to the 
+mathematical representation of the model, because the mortality
+rate is the same, but it's represented, in this test form,
+as a set of integrals instead of the analytic solution to
+those integrals. The algorithm in this new function will look
+considerably different. It could have its own faults, in its
+own corner cases, but they are unlikely to be the same faults
+as the original function. This is a tremendous improvement over
+not having such a test, where there is little clue about what
+the mortality rate should be for any given set of parameters.
 
-       \item numerical integration
-       
-       \item numerical derivatives
-    \end{enumerate}
-    \item There are a lot of techniques that would be slow but are useful.
-\end{enumerate}
+It's a lot of work to re-implement a mortality rate
+computation by writing it to calculate integrals numerically.
+It's even more work to re-implement a mortality rate
+computation by casting it as an individual-based model, but this,
+too, can be a good idea when the risk of faults is high.
 
+To make an individual-based model for mortality, a function would
+create a million or more individuals and draw a random number for
+the death of each, according to the mortality rate. Then the mortality
+rate is found from the mean and first moment of deaths in each
+age group.
+This kind of calculation is easier than writing the problem as
+numerical integration, if and only if the code to sample from
+mortality probability distributions is on hand.
+
+Sampling individual deaths is a gold standard test for a mortality
+calculation, and the calculation is so different from the 
+function under test, that it's unlikely to have similar faults,
+but what it tests can be far afield from the function's code itself.
+For instance, models for individuals could problematize using
+the function under test for small populations.
+
+What to test with brute force computation, and how to brute
+force that computation, depends on risk assessment, time, and
+whether your work is to question faults in the code or faults
+in the model.
 
 
 
 \subsection{Compare with limiting theory}\label{sec:limits}
 
-What can you do when you don't know what the answer to
-a function should be? One approach is to find cases
-where you know what it should almost be.
+Not every parallel implementation is an brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
 
-\subsubsection{Limiting cases}
-Use a Taylor series.
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
 
-Test by asking whether the result is less than delta away
-given that the input is less than epsilon away.
-Ask whether it gets closer as epsilon gets smaller.
+Sometimes a limit of a function is the same limit you know
+from high school precalculus,
+\begin{equation}
+  \lim_{x\rightarrow\infty} f(x).
+\end{equation}
+Maybe the limit goes to zero, or to 3, but the principle is
+the same. You can test that a function is near the limit
+as the value gets larger, or closer to zero. Better, you can
+test that the function gets closer to the limit as the
+parameter gets closer to its limit.
 
-
-\subsubsection{Find exact results}
-There may be some values for which the exact result
-is known. Take advantage of these.
-
-\subsubsection{Categorical behavior}
-Does the result move in the right direction when an input is perturbed?
-
-If the input has multiple axes, do you know how the result would
-depend on changing a value on the x-axis versus the y-axis?
-This can help you determine whether the axes are mixed up at all.
-
-
-\subsection{Micro-macro and macro-micro}
-
+This is a game where incremental understanding of math
+gives incrementally more careful attention to risk in the
+function under test. We can know the limiting value of a
+function, but we can also know how the function approaches
+that limit. Another precalculus friend, the Taylor series
+writes a function as a sum of terms that get smaller,
+\begin{equation}
+  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
+\end{equation}
+If we know the first term in the series, then the second term
+is a good guess for how far the function's output should be from
+the limiting value, as a function of $x$.
 
 
 \subsection{Another language or library}
-You could type almost the same code into another language. This is 
-particularly helpful for finding problems with data types, because
-these always change subtly between languages. Sometimes it's yet more
-helpful. For instance, R's matrix generalized inverse returns a different value
-from Python's generalized inverse. Maybe that's unexpected, but there are four
-kinds of generalized inverse, and the documentation doesn't always specify
-what you get.
+
+There is something lovely about the task of rewriting code from
+one language to another. On one side sits working code, problems
+solved. On the other is a green field for expressing it in the idioms
+of a new language. The original code is a gift, not only as a guide,
+but as a set of unit tests for the new code, but only for those
+willing to take the painful step of limiting their first translation
+to perserve structure around the riskiest functions.
+
+Most languages provide some built-in interoperability to call
+other languages. R, C++, Julia, and Python play like hamsters
+in a habitrail. It's perfectly reasonable to keep code from
+a different language in with the suite of unit tests and to
+call those functions when the interoperability is available.
+
+Testing across languages, or in the same language on different
+operating systems, can probe a unique set of problems. Data types
+change, revealing limits to numerical accuracy and inappropriate
+assumptions about data structure. Libraries change, the ones that
+provide special functions or system services. For instance, the
+generalized inverse in Python will return a different inverse
+from the generalized inverse in R. When this breaks tests, it
+clarifies which, of the four kinds of generalized inverse,
+the code needed, and that there should be a test to see which
+is available.
 
 
 \subsection{A figure in a paper}
@@ -633,10 +713,26 @@ test_that("paper numbers match computed", {
     \label{fig:wilson_chart}
 \end{figure}
 
-\subsection{Compare with your former answer, for refactoring}
-Regression testing. ``Make regression testing easy.'' - according
-to \emph{Release It!}
+\subsection{Regression tests}
+A regression test compares the result of a function against a previous
+result from that function. The parallel implementation, in this case,
+is the previous version of the same function.
 
+There is a book called \emph{Release It!} that says we should
+``make regression testing easy''~\cite{nygard2018release}. It's hard to make it easy
+because unit tests are built to test, not save output. Even if
+they save output from functions, it takes work to figure out
+\emph{how} a result changed if it did change. If the result
+is a data frame, did every value change, or some subset?
+
+While the book's advice is a research project, in its own right,
+it's a good focus for any particular project. Unit tests are
+most absolute in their pronouncement when they test the simplest
+functions. It's the mid-level functions, that do the more work
+and produce the most complex output, that benefit from regression.
+The high-level functions will change output every time you touch
+the code, but mid-level functions will change less frequently,
+and there's a chance to guess why they changed.
 
 
 
@@ -650,9 +746,33 @@ a sequence of if--thens. Worse, the middle of a function like this
 has embedded if--thens. These are logic tests, and getting them
 right can be painful.
 
-Traditional unit testing knows how to handle logic tests for parameters,
-and we restate that method here because it's awesome. Then we discuss
-how this tends to change for more math-y work.
+There are some cases where unit tests can exhaust all possible
+input combinations. For instance, bit-shifting functions on
+32-bit values can be tested for every possible 32-bit value
+in less than a few minutes. The same is not true for 64-bit values.
+
+In other cases, we have to choose which parameters and parameter
+combinations to test, and we limit the tests by identifying
+parameter values that are nearly-the-same test. For instance,
+if a function calculates age-standardized mortality rate, then testing
+the case where the mortality rate is 1.1 times larger hardly seems
+a different test. Instead, we might ask how the function handles
+missing values, zero values, or unusually sharp rises or falls in
+mortality rate. Sets of parameters that probe the same faults in
+the function under test are called \emph{equivalent.}
+
+Methods to test parameter logic all have the same underpinning,
+that they will try to test at least one set of parameters from
+each of the equivalence classes of inputs. Deciding what is an
+equivalence class can be difficult. Sometimes two parameters
+sets are equivalent in terms of the mathematical statement of 
+the model, but their representation in code makes one set
+have a different risk from another, for instance, due to
+denormalization. It can also be the other way around, that
+the mathematical statement of a model makes clear what paramater
+sets may be equivalent. Information from both statements of
+a function will be helpful.
+
 
 \subsection{Decision Tables}
 \aside{Categorical---give real example.}
@@ -747,6 +867,7 @@ is largely done by hand. Maybe you set the value of one parameter
 and then use an automated tool to generate the rest of
 the parameters given that one value. This stratification
 can halve the number of tests without increased risks.
+Python's Hypothesis helps build stratified tests.
 
 There are also two kinds of filtering you can do on 
 generated test cases. You can exclude tests for combinations
@@ -755,6 +876,9 @@ You can also filter out tests that you feel are less risky.
 These latter, soft conditions, make sense when you can
 look inside the code in order to assess risk.
 
+Together, stratification and filtering reduce the total number
+of tests to run so that they focus on the highest risks
+in the shortest time.
 
 \subsubsection{All Other Methods}
 If each run of a test takes a long time, it might be worthwhile
@@ -889,27 +1013,62 @@ Think of parameter-handling as translation from an external
 
 \section{Testing data movement}
 
-\subsection{Integration tests are important for science software}
+\subsection{Data movement}
 
-\subsection{Integration is Data movement}
-If the central work for the system under test is a
-long-running mathematical algorithm, there is usually some work
-to put the data into the best data structure for that algorithm
-to be efficient.
+We said earlier that there are three steps to making scientific
+software, choosing the mathematical model, discretizing that
+model, and deciding algorithms to implement the discretized model.
+Rarely is scientific software just one mathematical model
+and just one ensuing algorithm. It's a series of models supported
+by a series of algorithms.
 
-For instance, global health code works on
-hierarchies of locations, where the world is the root of the
-tree, and districts within countries are the leaves. If an algorithm
-will act on all children of a particular node in the tree,
-then it can help to sort data so that all child nodes follow
-their parents. Then data for children of a node is continuous
-in memory, increasing locality.
+For this software, as for any software, using the right algorithm
+ensures speed and scalability, and the right algorithm depends on
+its associated data structure. The relevant undergraduate class
+is called Data Structures and Algorithms, always the two together.
+As a result, performant scientific code is a series of algorithms
+joined by a series of translations from one data structure to
+another, each to support the next algorithm. The high-performance
+computing crowd calls any such code \emph{data movement,} as though
+it were excreted, but software engineers call it integration code
+and call the testing of it integration testing.
+
+\subsection{Integration testing data movement}
+
+A classic example of data movement is reorganizing a multidimensional
+array from one axis ordering to another. An algorithm with nested
+for-loops usually acts on nested axes. The order of the axes should
+put those for the inner loops last (for C and Python which are row-first), or put those
+same axes first (for R and Julia which are column-first). This so
+often controls the speed of an algorithm that it isn't considered an 
+optimization to fix it but an error to fail to set the order.
+
+More complicated an example would be translating a graph from
+an edge-list representation to an adjacency matrix representation.
+Both have their place, but the correct form depends on the
+algorithm that will act on this data.
+
+The question isn't how to test data movement. It's that data
+movement is separate from the algorithm. It should be a separate
+function and tested on its own. It has its own set of faults,
+that center around integer arithmetic, the off-by one errors,
+the loop endpoint errors. These are different in nature from
+the taxonomy of faults that plague an algorithm-in-itself,
+but they are no less debilitating to correctness.
 
 \subsection{The CRUD case}\label{sec:crud}
-From a testing standpoint, the work done during data movement
-falls into the create-read-update-delete (CRUD) categories.
-For the scientist using the code, they might understand
-descriptions such as
+
+The prosaic brother to data movement is the ubiquitous selection
+and editing of data frames we do when reading and writing data.
+The data frame, in which this data typically lives, is the
+algorithmic equivalent of a minivan, fully equipped but less
+computationally intriguing.
+
+Dataframe manipulation for loading and saving data is more a matter
+of how we want to specify a program than about moving from
+one data structure to another. There is, happily, a framework
+for recording and conveying this work, the create-read-update-delete
+(CRUD) list.
 
 \begin{itemize}
 \item \textbf{Create} - If the input data doesn't have excess mortality,
@@ -924,9 +1083,6 @@ descriptions such as
 These are requirements. Failure to meet one of these requirements
 often won't make the code stop running. It will harm confidence
 in the code.
-
-\emph{Testing data movement is about assurance that the
-function under test meets requirements.}
 
 These tests are therefore classic boundary-value tests, where
 we try parameters at the lower boundary, upper boundary,
@@ -1021,12 +1177,13 @@ developer by writing \textsc{crud} assertions in English.
 Then we can write tests that verify these \textsc{crud} requirements for
 each of the 576 kinds of inputs. \aside{show the test}
 
-\subsection{Changing data structures}
-How to test moving data from one data structure to another.
 
 \subsection{Trust the movement}
-Trusting movement lets you reuse code.
 
+In order to test data movement separate from the main algorithm,
+we have to separate data movement from the main algorithm.
+This is one of those times that what is testable indicates what
+is modular in code.
 
 
 \section{Using symmetry to test a function}
@@ -1034,7 +1191,7 @@ Trusting movement lets you reuse code.
 Sometimes knowing the math of a software function lets you
 test the software, even when you have an oracle problem.
 \emph{Metamorphic testing} uses the symmetry of the math function
-in order to test the correctness of the software function.
+in order to test the correctness of the software function~\cite{ding2016,guderlei2007,kanewala2015,liu2014}.
 
 The mathematical description of a function is that it relates
 a domain (input) to a range (output). We write $f(x) = y$.
@@ -1106,42 +1263,192 @@ a function?
 
 \section{Testing the compiler}
 
-Good compiler optimization can break good code.
-This is more true for code that uses \cpu features, such as special instruction
-sets designed for fourier transforms, video encoding, and the like. These
-special instruction sets also support mathematical libraries.
+Let's say you have a cluster of computers. They are all Intel machines,
+but they come from different years. They could be different architectures
+or just different steppings of the CPU, which is the least difference
+one can have between two chipsets. You compile code on one machine,
+or you install some R package that compiles code underneath. When
+you move to another computer on another day, that same code fails
+to run with the message, ``invalid opcode.''
 
-So make acceptance tests, the ones that run during installation, that
-verify the code works as expected.
+An opcode is a machine-language instruction. The computer you used
+yesterday knew a command that's slightly too fancy for the computer
+you're using today, and it failed. You have to clean out the code
+and recompile today. It's not that the new computer is just older.
+It's still possible that, were you to switch back, there might be
+the same message again. The history of CPU opcodes isn't a forward
+march into a larger, better set.
+
+That scenario would be annoying, and it's a headache for people
+saddled with heterogenous clusters. They solve it with, for instance,
+creating architecture-specific shared drives so that they can
+install a different version of the software for each version of
+system architecture on the cluster. That scenario is, however, a
+best case scenario.
+
+The worse scenario, and I wish this were rarer, is that the
+software runs on the other computer but gives the wrong error.
+It can fail silently. This seems like an abrogation of a compiler's
+contract with its faithful coder, but it isn't. That compiler
+ensured that the code ran well enough on one target architecture.
+The problem is that compiler optimizations at level O3, and above,
+are willing to make slightly riskier choices that yield great
+performance benefits. These choices are tuned to the architecture
+at hand, or as requested by compiler options, and, while they may
+run on similar architectures, carry more risk of error on them.
+It solves the problem of having languages
+that don't clearly represent time-saving invariants and of coders
+who can't afford motorcycles.
+
+There's a solution for this, too. Turn all optimizations down
+to O2 or lower. Or claim that the CPU uses the SSE2 instruction set.
+Unless you're intentionally commemorating the death of Phil Katz, you'll see
+this as a severe loss of performance.
+
+The last option to deal with this problem is called acceptance
+testing. It means that you create a test to run before you
+run code on a new machine. It won't do the work of creating
+a separate version of the code, if needed, but it tells you if
+you need it. You don't generally care about integer performance
+here. You care about vectorized code and floating-point code.
+That's where the problems will be, so you can subset the test
+suite for these acceptance tests.
+
+Designating a subset of all tests as acceptance tests is an
+example of test case prioritization~\cite{rothermel1999test}.
+We prioritize tests by hand, by marking tests to be run under
+different conditions, but tests for scientific code can be lengthy,
+which makes it worth considering automatically reordering tests
+so that those that are most sensitive to correctness run by 
+themselves, or run first~\cite{yoo2012regression}.
 
 
 \section{Random changes to the code}
-\subsection{Fuzzing Inputs}
-\subsection{Mutating Code}
-Tests unit tests.
+The function under test, as with any block of code, can be
+represented as a syntax tree. This tree of operators, operands,
+and assignments, represents a contract with the compiler,
+represents the flow of information from parameters to output,
+represents a treasure map of potential faults. There is a form
+of testing that reads the function under test, creates its
+syntax tree, and randomly mutates it. It adds a one to the
+limit of a loop, and runs the unit tests again. It changes
+the order of assigment statements and tests again. Each time
+it records the change to the tree, and the outcome of the tests.
+
+When the test suite is mature, then there should be some test
+that fails for each mutation, but that isn't the case. There
+will be twenty percent of genetic mutations of the code that
+cause no test to fail, and most of those won't indicate the
+code has a fault, or even that tests are incomplete. Instead,
+these cases force a question about what choices in the code
+matter and what is irrelevant.
+
+One way to measure what matters in code is to pick a
+parameter and mark every line where its value affects
+an assignment. Then track each of those down the line.
+You'll see that only under certain conditions do certain
+parameters change a result.
+
+A similar way to understand a function is to choose central
+moments, the lines where the important math happens, and
+trace back to what affected those lines and forward to
+how those lines become the result.
+
+These are lenses into the code that clarify relationships
+among corner cases, dependence and independence from
+line-by-line choices. The lens is more important than the
+mutation technique, which should be left to those with
+undue free time or responsibility for manned rockets.
+
 
 \section{Outside the code}
 
-\subsection{Team is the Larger Problem}
+\subsection{Documentation defines what a function wants to be}
 
-There are two kinds of problems, how to test and the culture
-of a scientific team~\citep{neumann2016,kanewala2014}.
+The section above, on parameter testing, uses a function that's a hybrid
+between Wilson's score interval and a Poisson estimator. That hybrid
+doesn't have a name, and there's no paper or Wikipedia entry for it.
+We can test that its output is a continuous function of its input
+parameters. We can test that it matches known values for limiting cases,
+but the right version of this function is the one that a team agrees
+is right.
+
+That team is usually not just the people in the room. It includes stakeholders
+outside the room. It includes reviewers. It includes future versions of the team.
+
+The tests can be a clear statement of the contract this function upholds.
+So, too, can project documents, as mentioned in the data movement section,
+where CRUD defines selection from a dataframe. Documentation isn't just
+another link in the chain of understanding. It is where the software
+developer, the one who wrote the function, states their understanding
+of the contract that function fulfills. It's the closest statement,
+in English, of what unit tests should assert.
+
+Like all other work, documentation takes time and is prioritized by
+how it addresses risk. Give the highest-level explanation first.
+This could be a reference to a paper, a book section, documentation from another library.
+Then say \emph{why} this function exists and \emph{why} it works the
+way it does.
+
+And on the technological side, equations in documentation communicate
+clearly with research-oriented readers. Similarly, code examples, run
+as unit tests themselves, within the documentation, ensure always-working
+examples for development.
 
 
-\subsection{Documentation defines what it should be}
-What equation did you intend to write? Answer that by putting math right in
-the documentation of the code. Sometimes code correctly implements an incorrect
-assumption about the math.
+\subsection{Team is critical to tests}
 
-\subsection{Attention is in short supply}
-Your mistakes can be that you fooled yourself.
+Take a function under test and project it onto a
+screen at the front of a meeting room. Place around that screen
+the team you have or the team you would like to have.
+Engineering studies show that the future utility, or burden,
+of that function depends no more on its testing than it
+depends on the culture of that team~\citep{neumann2016,kanewala2014}.
 
-\subsection{Being useful gets you help}
-How do you set yourself up for external help? You write code others can run and use.
+Culture is beyond the scope of this document, but conversations
+aren't. One point to raise in that meeting room could
+be the effect of discretization or floating point representation
+on the mathematical representation. Another could be a
+description of statistical properties of the function, a set
+of equations, beyond those to implement the function, that
+describe its expected behavior. Someone could raise an observation
+that brute force solution is suprisingly possible.
+The team could discuss likely sets of parameters that might
+matter, some determined by the math, some by logic in the
+code. A product manager could supply CRUD requirements.
+A systems engineer could describe the expected architectures
+and risk of failure due to optimization levels. Whether these
+are separate people or roles for a very few people, their
+communication gives testing the best chance at relevance.
 
-\subsection{Gold standard is multiple reviewers}
-Other code, expert opinion on results from multiple disciplines.
+Testing well is helpful, but we saw, in the section about
+data movement, that identifying what is data movement
+and what is an algorithm meant we could label the two.
+Giving a function a good name is important to a software
+developer, but scientific code is rarely owned by a team
+of software developers. It's shared by a team of researchers.
+That team has a body of knowledge about the software, and,
+the same as any body of knowledge, it's a shared set of
+understanding where new things are added and less useful
+ideas are dropped.
 
+In this research environment, collaboration on testing
+creates commonly-understood, trusted functions. These, more
+than any single snapshot of the whole calculation, are
+what the group understands about the code. These trusted
+functions will be copied into other projects, translated
+to other languages. They will exist long beyond the work
+that has your name.
+
+\section{Further Reading}
+\begin{itemize}
+	\item \emph{Software Testing: A Craftsman's Approach,}~\cite{jorgensen2013}.
+	\item \emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\cite{pezze2008}.
+	\item \emph{Working Effectively with Legacy Code,}~\cite{feathers2004working}.
+	\item \emph{Software Engineering for Science,}~\cite{carver2017}.
+	\item ``Testing Scientific Software: A Systematic Literature Review,''~\cite{kanewala2014}.
+	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
+	\end{itemize}
 
 \appendix
 
