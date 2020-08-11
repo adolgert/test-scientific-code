@@ -4,8 +4,20 @@
 \usepackage{framed}
 \usepackage{xspace}
 \usepackage[utf8]{inputenc}
+\usepackage{fontspec}
+% This section makes Fira work.
+\setmonofont{Fira Code}[
+  Contextuals=Alternate  % Activate the calt feature
+]
+
+\makeatletter
+\def\verbatim@nolig@list{}%
+\makeatother
+
 \usepackage{listings}
+\usepackage{lstfiracode}
 \usepackage{url}
+
 
 % For natbib, \citet for textual, \citep for parenthetical,
 % \citeauthor and \citeyear.
@@ -34,10 +46,14 @@
 \author[1]{Andrew Dolgert}
 \affil[1]{IHME, University of Washington}
 
-\keywords{computation, software}
+\keywords{software testing, unit testing, scientific software}
 
 \begin{document}
-\lstset{basicstyle=\footnotesize\ttfamily, backgroundcolor=\color{green!20}}
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  style=FiraCodeStyle,
+  %backgroundcolor=\color{green!20}
+  }
 
 \begin{abstract}
 Scientific code has a lot of math. Mathematical code can be tough to test
