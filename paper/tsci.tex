@@ -718,15 +718,29 @@ and there's a chance to guess why they changed.
 
 \section{Testing parameter logic}\label{sec:parameter-logic}
 \subsection{Introduction}
-While an algorithm in your \emph{Matrix Computations}~\citep{golub2013} book may seem
-unequivocal, every important function in scientific code accretes
-options, parameters, and choices.
-The start of a function like this has
-a sequence of if--thens. Worse, the middle of a function like this
-has embedded if--thens. These are logic tests, and getting them
-right can be painful.
+If we need to implement some matrix algorithm because of some structure
+in our computation, and it's not already in a major library, then
+we might make a function that has a few arguments, the matrix, algorithm parameters
+to control cutoffs in the algorithm, and options to determine whether
+the result is written back into the source matrix memory.
+The data, parameters, and options are all, in the eyes of unit testing,
+parameters.
 
-We have to choose which parameters and parameter
+These three kinds of parameters, however, tend to affect functions
+differently. Options appear in the test of if--thens, so they change
+the code path. The code path is the sequence of blocks of code that execute
+for a particular set of parameters.
+Algorithm parameters tend to appear in key equations, so that they
+have limited effects on data flow in a function. The data flow is a graph
+of which values in a function depend on which previous values.
+The input matrix, itself, is effectively a two-dimensional set of
+parameters, greatly increasing the number of possible inputs to a function.
+
+
+\subsection{Decision Tables}
+
+Given that scientific functions have large spaces of possible inputs,
+we have to choose which parameters and parameter
 combinations to test, and we limit the tests by identifying
 parameter values that are nearly-the-same test. For instance,
 if a function calculates age-standardized mortality rate, then testing
@@ -750,9 +764,6 @@ the mathematical statement of a model makes clear what parameter
 sets may be equivalent. Information from both statements of
 a function will be helpful.
 
-
-\subsection{Decision Tables}
-\aside{Categorical---give real example.}
 A decision table enumerates sets of inputs and desired outputs for each set.
 For example, if a variable can be 0, 1, or 2, then there are three possible
 inputs. The chart would be three lines long. If the function were $2^n$,
