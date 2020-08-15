@@ -335,6 +335,13 @@ between the two.
 The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
 It takes the whole set of values and reduces it to one number I can assert must be less than some value.
 
+When values range from small to large, it's convenient to use
+relative error instead of absolute error.
+\begin{equation}
+  \mbox{relerr} = \frac{\hat{Y}_i - Y_i}{Y_i}
+\end{equation}
+The known value is always in the denominator.
+
 Even more reassuring for a unit test, I can take all of the
 sets of values and take the maximum absolute error,
 $\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
@@ -493,28 +500,32 @@ a function isn't too wrong.
 \section{Parallel Implementation}\label{sec:parallel-implementation}
 \subsection{Write it Twice}
 Read through unit tests, and they all have the same form.
-Set up data and parameters to pass to a function. Call the
-function. Compare its output to some known answer, or to
+They set up data and parameters to pass to a function, call the
+function, and either compare its output to some known answer or to
 something known about the answer. Every unit test is two
-functions, the function under test and some parable form
-of that function, written into the unit test itself~\cite{howden1986functional,sirer1999using}.
+functions, the function under test and a parable
+of that function, written into the unit test itself.
 
 There are times that it's reasonable to write a test version
-of a function, some second, similar way. More often, we write
-a function once using its most obvious, probably slowest, algorithm.
+of a function, some second, similar way. In fact, we most often write
+a function first using its most obvious, probably slowest, algorithm.
 The obvious algorithm is an excellent unit test on any refinement.
 
-Two implementations of the same model differ based on how early
-in the design they diverge from each other.
-There are three steps to writing a function for scientific software~\citep{dahlgren2005}:
+We can find an appropriate parallel implementation for testing by
+looking at the set of choices we make when writing the original function
+and asking, at which step should the second implementation differ
+from the first.
+\cite{dahlgren2005} describe three steps to writing a function for
+scientific software, and we'll add one step before theirs.
 \begin{enumerate}
+  \item Represent the mathematical model.
   \item Prepare discrete models.
   \item Translate the models into algorithms.
   \item Code the models using programming languages.
 \end{enumerate}
 If only the algorithm in the code changes, then the results
 should be quite similar. If the models are discretized differently,
-then they it takes more care to use one for testing of the other.
+then it takes more care to use one for testing of the other.
 Which you choose depends on the kinds of faults you think pose
 the most risk in the code.
 
@@ -526,13 +537,15 @@ especially to use of parallel implementations, so let's
 look at how alternative choices probe faults in code.
 
 \begin{callout}
-\textbf{The Oracle Problem}---Sometimes
-we don't know what the result of a function should be. That's called
-the oracle problem. It's a unique feature of mathematical code that
-the best information on what a function should return is the function you just
-put in your code. Testing methods below circumvent the oracle problem
-by finding simpler inputs, comparing results with another implementation,
-or checking properties of the function without checking the function itself.
+\textbf{The Oracle Problem}---
+Imagine that there were some source to tell you what the answer to a function
+should be. It could be a software engineering support tool, or it could
+be your scratchwork on a notepad. This source is known as an
+oracle~\citep{howden1986functional}, and its absence for scientific code
+is the oracle problem~\citep{sirer1999using}. Despite the name, this
+is hardly a tragedy because testing methods can 
+finding simpler inputs, compare results with another implementation,
+or check properties of the function without checking the function itself.
 \end{callout}
 
 
@@ -540,105 +553,46 @@ or checking properties of the function without checking the function itself.
 
 Let's say we are supposed to calculate the mortality rate
 for five-year age groups from birth to eighty years old,
-for a Gompertz-Makeham mortality law,
-\begin{equation}
-  \mu(x) = \alpha e^{\beta x} + \lambda.
-\end{equation}
-The function under test is a formula
-from a book, once pasted as a \textsc{png} into a Jira story.
-That function comes from the putting the Gompertz mortality
-rate into the integral for mortality,
-\begin{equation}
-  {}_nm_x = \frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(-\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(-\int_{x_n}^s\mu(a)ds)ds}.
-\end{equation}
-Someone plugged the Gompertz function for $\mu(x)$ into this
-formula in order to get the equation in the book.
+for a Gompertz-Makeham mortality law. The parameters are
+$(x, \alpha, \beta, \lambda),$ intermediate values are $(\mu, S)$ and the result is ${}_nm_x$.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  S(x) & = & \exp\left(-\lambda x - \frac{\alpha}{\beta}\left(e^{\beta x} - 1\right)\right) \\
+  {}_nm_x & = & \frac{\mu(x+n) S(x+n) - \mu(x)S(x)}{S(x) - S(x+n)}
+\end{eqnarray}
+Wherever this equation comes from, whether it be a book or a
+\textsc{png}\ in a Jira story, we can identify risks in transliterating
+these equations to code. The most likely faults are improperly grouping
+algebraic operations, mistaking signs, and forgetting terms. 
 
-We can check the code with a parallel implementation,
-where the new version does the integrals in the equation
-above. It will be very slow by comparison, but the answer should
-be the same within single precision if we are working in double precision.
+We can address those risks by returning to the first step of writing
+a scientific function, which is how we represent the mathematical model.
+The equations above are the result of integrating a function that has fewer
+steps, even though it would be slower to run.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  {}_nm_x & = &\frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(-\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(-\int_{x_n}^s\mu(a)ds)ds}.
+\end{eqnarray}
+The resulting ${}_nm_x$ should be the same as that above within
+machine precision, where machine precision means that we expect a drift
+of about one machine epsilon for each step of the integration. That means
+it should agree within several thousand times machine epsilon.
 
-This isn't a change to the model. It's a change to the 
-mathematical representation of the model, because the mortality
-rate is the same, but it's represented, in this test form,
-as a set of integrals instead of the analytic solution to
-those integrals. The algorithm in this new function will look
-considerably different. It could have its own faults, in its
+This new version could have its own faults and its
 own corner cases, but they are unlikely to be the same faults
 as the original function. This is a tremendous improvement over
-not having such a test, where there is little clue about what
-the mortality rate should be for any given set of parameters.
+not having such a test.
 
-It's a lot of work to re-implement a mortality rate
-computation by writing it to calculate integrals numerically.
-It's even more work to re-implement a mortality rate
-computation by casting it as an individual-based model, but this,
-too, can be a good idea when the risk of faults is high.
-
-To make an individual-based model for mortality, a function would
-create a million or more individuals and draw a random number for
-the death of each, according to the mortality rate. Then the mortality
-rate is found from the mean and first moment of deaths in each
-age group.
-This kind of calculation is easier than writing the problem as
-numerical integration, if and only if the code to sample from
-mortality probability distributions is on hand.
-
-Sampling individual deaths is a gold standard test for a mortality
-calculation, and the calculation is so different from the 
-function under test, that it's unlikely to have similar faults,
-but what it tests can be far afield from the function's code itself.
-For instance, models for individuals could problematize using
-the function under test for small populations.
+There are many possible parallel implementations. For this example,
+we could make the looser assertion that the relative error of ${}_nm_x$
+to $\mu(x)$ should be less than some cutoff. It's not as strong a test,
+but it's quick to write.
 
 What to test with brute force computation, and how to brute
 force that computation, depends on risk assessment, time, and
 whether your work is to question faults in the code or faults
 in the model.
 
-
-
-\subsection{Compare with limiting theory}\label{sec:limits}
-
-Not every parallel implementation is an brute-force retelling
-of a model. Most mathematical functions provide finger-holds
-support of their correctness.
-
-The simplest of these are parameters for which a function
-takes a known value. The function could be a mess of
-polynomials of trigonometric quantities,
-\begin{equation}
-  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
-\end{equation}
-but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
-and so on. If the function should divide by zero for some
-number, then that, too, is a parameter for which the function
-has a known value, an exception.
-
-Sometimes a limit of a function is the same limit you know
-from high school precalculus,
-\begin{equation}
-  \lim_{x\rightarrow\infty} f(x).
-\end{equation}
-Maybe the limit goes to zero, or to 3, but the principle is
-the same. You can test that a function is near the limit
-as the value gets larger, or closer to zero. Better, you can
-test that the function gets closer to the limit as the
-parameter gets closer to its limit.
-
-This is a game where incremental understanding of math
-gives incrementally more careful attention to risk in the
-function under test. We can know the limiting value of a
-function, but we can also know how the function approaches
-that limit. Another precalculus friend, the Taylor series
-writes a function as a sum of terms that get smaller,
-\begin{equation}
-  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
-\end{equation}
-If we know the first term in the series, then the second term
-is a good guess for how far the function's output should be from
-the limiting value, as a function of $x$.
 
 
 \subsection{Another language or library}
@@ -652,7 +606,7 @@ willing to take the painful step of limiting their first translation
 to perserve structure around the riskiest functions.
 
 Most languages provide some built-in interoperability to call
-other languages. R, C++, Julia, and Python play like hamsters
+other languages. R, C++, Julia, and Python play together like hamsters
 in a habitrail. It's perfectly reasonable to keep code from
 a different language in with the suite of unit tests and to
 call those functions when the interoperability is available.
@@ -662,7 +616,7 @@ operating systems, can probe a unique set of problems. Data types
 change, revealing limits to numerical accuracy and inappropriate
 assumptions about data structure. Libraries change, the ones that
 provide special functions or system services. For instance, the
-generalized inverse in Python will return a different inverse
+generalized inverse in Python will return a different value
 from the generalized inverse in R. When this breaks tests, it
 clarifies which, of the four kinds of generalized inverse,
 the code needed, and that there should be a test to see which
@@ -694,19 +648,19 @@ paper_numbers = data.frame(list(
     4, 4, 18, 4,
     3, 20, 49, 18,
     13, 59, 16),
-  p = c(
+  p = c(  # "Total n" column
     1, 1, 0.8333, 0.4667,
     0, 1, 0.4286, 0.5385, 1,
     .5, .75, 0.6667, 0.5,
     1, 0.6, 0.5306, 0.6111,
     0.3846, 0.3898, 0.5),
-  w_minus = c(
+  w_minus = c(  # "p(shall)" column
     0.2065, 0.2065, 0.4365, 0.2481,
     0, 0.6097, 0.1582, 0.2914, 0.4385,
     0.15, 0.3006, 0.4375, 0.15,
     0.4385, 0.3866, 0.3938, 0.3862,
     0.1771, 0.2758, 0.28),
-  w_plus = c(
+  w_plus = c(  # "D:w-" column
     1, 1, 0.9699, 0.6988,
     0.7935, 1, 0.7495, 0.7679, 1,
     0.85, 0.9544, 0.8372, 0.85,
@@ -750,12 +704,12 @@ they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
 is a data frame, did every value change, or some subset?
 
-While the book's advice is a research project, in its own right,
+While following the book's advice is a research project,
 it's a good focus for any particular project to find places in the
 code where regression tests would be most informative. Unit tests are
 most absolute in their pronouncement when they test the simplest
-functions. It's the mid-level functions, that do the more work
-and produce the most complex output, that benefit from regression.
+functions. It's the mid-level functions, that do more work
+and produce the more complex output, that benefit from regression.
 The high-level functions will change output every time you touch
 the code, but mid-level functions will change less frequently,
 and there's a chance to guess why they changed.
@@ -772,12 +726,7 @@ a sequence of if--thens. Worse, the middle of a function like this
 has embedded if--thens. These are logic tests, and getting them
 right can be painful.
 
-There are some cases where unit tests can exhaust all possible
-input combinations. For instance, bit-shifting functions on
-32-bit values can be tested for every possible 32-bit value
-in less than a few minutes. The same is not true for 64-bit values.
-
-In other cases, we have to choose which parameters and parameter
+We have to choose which parameters and parameter
 combinations to test, and we limit the tests by identifying
 parameter values that are nearly-the-same test. For instance,
 if a function calculates age-standardized mortality rate, then testing
@@ -793,8 +742,10 @@ each of the equivalence classes of inputs. Deciding what is an
 equivalence class can be difficult. Sometimes two parameters
 sets are equivalent in terms of the mathematical statement of 
 the model, but their representation in code makes one set
-have a different risk from another, for instance, due to
-denormalization. It can also be the other way around, that
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
 the mathematical statement of a model makes clear what parameter
 sets may be equivalent. Information from both statements of
 a function will be helpful.
@@ -836,6 +787,48 @@ In the example here, we knew the exact answers.
 When there are more cases, you may only be able to \aside{specify properties} of the
 answer as a function of the parameters. It's a weaker check,
 but it could help.
+
+\subsection{Limiting values of parameters}\label{sec:limits}
+
+Not every parallel implementation is an brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
+Sometimes a limit of a function is the same limit you know
+from high school precalculus,
+\begin{equation}
+  \lim_{x\rightarrow\infty} f(x).
+\end{equation}
+Maybe the limit goes to zero, or to 3, but the principle is
+the same. You can test that a function is near the limit
+as the value gets larger, or closer to zero. Better, you can
+test that the function gets closer to the limit as the
+parameter gets closer to its limit.
+
+This is a game where incremental understanding of math
+gives incrementally more careful attention to risk in the
+function under test. We can know the limiting value of a
+function, but we can also know how the function approaches
+that limit. Another precalculus friend, the Taylor series
+writes a function as a sum of terms that get smaller,
+\begin{equation}
+  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
+\end{equation}
+If we know the first term in the series, then the second term
+is a good guess for how far the function's output should be from
+the limiting value, as a function of $x$.
+
 
 \subsection{Test Case Generation}
 \aside{By-hand versus complete cases}
