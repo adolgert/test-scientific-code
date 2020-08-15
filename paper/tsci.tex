@@ -4,8 +4,20 @@
 \usepackage{framed}
 \usepackage{xspace}
 \usepackage[utf8]{inputenc}
+\usepackage{fontspec}
+% This section makes Fira work.
+\setmonofont{Fira Code}[
+  Contextuals=Alternate  % Activate the calt feature
+]
+
+\makeatletter
+\def\verbatim@nolig@list{}%
+\makeatother
+
 \usepackage{listings}
+\usepackage{lstfiracode}
 \usepackage{url}
+
 
 % For natbib, \citet for textual, \citep for parenthetical,
 % \citeauthor and \citeyear.
@@ -34,10 +46,14 @@
 \author[1]{Andrew Dolgert}
 \affil[1]{IHME, University of Washington}
 
-\keywords{computation, software}
+\keywords{software testing, unit testing, scientific software}
 
 \begin{document}
-\lstset{basicstyle=\footnotesize\ttfamily, backgroundcolor=\color{green!20}}
+\lstset{
+  basicstyle=\footnotesize\ttfamily,
+  style=FiraCodeStyle,
+  %backgroundcolor=\color{green!20}
+  }
 
 \begin{abstract}
 Scientific code has a lot of math. Mathematical code can be tough to test
@@ -60,39 +76,32 @@ traits of an equation can confirm that its implementation in code is correct.
 \tableofcontents
 \section{Introduction}\label{sec:introduction}
 
-I write code in two completely different ways. When I'm thinking about the math of it,
-I work in notebooks and scripts, in \rlang and Python. When I'm designing a tool
-from that math, I work in projects and libraries, in \cpp and Python.
-In the notebook, I can plot the code, and print the code, and coax it until it does
-its trick. The notebook reassures me that this work is well-behaved while
-I'm looking. Sometimes, though, when I put that same code in the middle of a well-engineered
-library, it waits until I'm not looking and jumps up on the counter to steal a snack.
+The code for a scientific application, laid out across a monitor,
+will have plenty of functions that look like those of any other application.
+It will parse command-line flags, parse input files, and maybe even have
+an event loop. Some portion, however, will look entirely different. It
+may be laden with long equations, or it may be integer manipulation or
+graphs, but the functions that do this work are complex, and they carry risk.
 
-If you look at a finished application, it has dialog boxes or command line switches,
-all of which we can call software features. The application has a feature or doesn't
-have a feature. For some combination of features, the application can process this data or it can't.
-The data, itself, can have surprising variety. Someone, some time, will give this program
-data it didn't expect. Meanwhile, the application calls a function which calls a function
-which does the math that's transliterated from an \rlang notebook that showed the
-right plot that one time.
+Those scientific functions are as complicated as they have to be
+in order to model some feature of the world. Their math, whether mundane
+or arcane, makes it difficult to use traditional unit tests to address
+the risk of failure in these functions. When a model is supposed to represent
+a subtle behavior of the world, testing that its output is correct feels
+like an existential assertion.
 
-For the rest of an application, I use unit testing, integration testing, regression
-testing, whatever. They do a great job of telling me that the application can handle
-a particular combination of features. The math-y bits, that form the heart of what
-this application does, those can be hard to test. If I write a function that looks
-at past life expectancy to predict future life expectancy, which answer is right,
-for this given input data? So I'm going to write unit tests, but they have a different
-flavor than what we might see in a good unit testing book like \cite{jorgensen2013}.
+However scientific models, and the functions that comprise them,
+always have behavior we can discover, characterize, and assert in a unit
+test. Some of that behavior is approximate, that the result be near a
+value. Some is exact, in a limit or at a boundary.
 
-We can discuss some of the basic moves that protect mathematical code when
-it's nestled in a software application. Some of those tests are about traits
-that make math code special, such as its use of floating-point calculations and
-statistics. Some of those tests are reminders to see where standard software engineering
-applies here, too.
+Assuming we've read a good unit testing book like \cite{jorgensen2013},
+and that we can figure out, elsewhere, the construction of unit tests
+in code, let's assess the risks that are unigue to scientific code.
+Let's look at how the tools we already know can address those risks
+and how some new tools might help when the stakes are high.
 
-Examples may wander through \rlang, Python, \cpp, or Julia, in order to perplex everyone
-equally. I won't recommend a software testing framework, because they are all \textsc{ok}
-enough. There isn't code to check out from GitHub, and it won't contribute to your final grade.
+
 
 
 \section{Testing Numbers}\label{sec:ieee-numbers}
@@ -185,10 +194,10 @@ $-0=0$, and that will be true. Rely on \lstinline!is.nan! and
 Comparison of two floating points, the regular kind that aren't
 infinite or \nan, has its own problem. If you set
 $x = 3.0$ and $y=9.0 / 3$, then you will probably find they
-aren't equal. At least, $x==y$ will fail most times, because
+aren't equal. At least, \lstinline!x==y! will fail most times, because
 they floating point math is usually approximate. We test for this
 using a value called \emph{machine epsilon.} Every language defines
-this value. I think of it as the least difference between the
+this value. It is the least difference between the
 mantissa of two numbers.
 
 Every floating-point number is expressed as a mantissa times
@@ -238,10 +247,11 @@ to unravel it.
 
 
 \subsection{Factors Are Many Parameters}
+\aside{Seems should go in section 5.}
 We talked about combinatorial testing of parameters
 in Sec.~\ref{sec:parameter-logic}. That section was talking about
 parameters that are boolean, or ternary, or one value of ten.
-A double can take on about $10^19$ different values. A single
+A double can take on about $10^{19}$ different values. A single
 can take on about $10^9$ different values. We can't treat them
 like other parameters.
 
@@ -281,36 +291,26 @@ even more on the particular math. Some suggestions:
 
 \subsection{Randomized calculations should give different answers each time}
 
-% Joint attention.
-% - Focus is a specific function.
-% - Focus is a kind of function.
-%   The function is presented to us with a question about correctness.
-% - Focus is a pile of statistical tests.
-%
-% The network.
-% - The code itself could be simulation.
-% - The code itself could be deterministic.
-% - The data could be randomly generated (by your test).
-% - When and how you run unit tests.
 
-% random gaussian elimination (nondeterministic). simulation.
 A simple Gaussian elimination can benefit from random pivoting.
-A function to sample a distribution is inherently random.
+A function to sample a distribution is supposed to return a new value
+every time it's called.
 Some functions introduce random reorderings
 so they can insist that the caller not expect a given order
 in the output. All of these perfectly useful functions
 thwart using simple lookup tables to test their output.
 
-The tests, themselves, can even be the problem. I'll check
+The tests, themselves, can even be the problem when we randomly
+generate test cases. I'll check
 a life expectancy function against a corpus of life expectancies
 for every country. I'll randomly generate user input
 to see that a functions succeeds or gracefully fails.
-It's a kind of test case generation.
 
-We have on our side during testing some basic tools
+When testing these random functions,
+we have on our side some basic tools
 of statistics. Some, like mean square error, are ways
 to heap our uncertainty into a single, tidy number.
-Others, like a Kolmogorov-Smirnov test, are formal statistical
+Others are formal statistical
 tests. They take a clear side-effect of a function,
 its randomness, and tame it to measurable uncertainty.
 
@@ -340,7 +340,7 @@ low error everywhere else.
 \subsubsection{Variance, standard deviation}
 When there is just one vector of random numbers coming out
 of a function, it can be helpful to characterize how far
-they are from some mean value. The variance is
+they are from their average value. The variance is
 the average of how far each value is from the average of all
 values, but you'd never calculate it. It's always avaiable
 as \lstinline!var! or \lstinline!variance! in any language.
@@ -349,7 +349,7 @@ The standard deviation is the square root of this.
 If there's no variance, then every value in the vector is
 the same. If the variance keeps getting larger when the
 function is run again to make longer outputs, there is a
-chance that's OK. Some distributions, such as the Cauchy
+chance that's \textsc{ok}. Some distributions, such as the Cauchy
 distribution, don't have a variance.
 
 \subsubsection{Standard deviation}
@@ -359,13 +359,15 @@ have some average value, but they vary around that average value.
 If we run this function a thousand times and take the
 lower value, below which 2.5\,\% of the results fall,
 and the upper value, above which 2.5\,\% of the results fall,
-then this interval is the standard deviation.
+then this interval is the 95\,\% standard deviation.
 
 For research statistics, the standard deviation is often part
 of an argument that a model of a problem is appropriate to
 the observed data. For unit testing the standard deviation
 is a rule of thumb for how often a perfectly good unit test
-will randomly fail.
+will randomly fail. If you want it to fail five percent of
+the time, use a 95\,\% interval. If you want it to fail
+one time in a thousand, use a 99.9\,\% interval.
 
 Given that results from a function are random, and we
 want to make some cutoff on which results are acceptable,
@@ -399,7 +401,7 @@ even in the presence of noise. It can say whether the output
 isn't linear enough, or whether it's too linear.
 
 
-\subsection{Random seeds}
+\subsection{Taming randomness}
 
 I make tests with random inputs, so they explore more alternative
 paths in the code than I might guess. I run tests of random
@@ -417,7 +419,7 @@ tries. This means the green lights of a unit test display will
 be red without reason once in a thousand times, but that's
 enough not to pay attention to a red light. It's enough to
 rerun the test suite every time there is any red light.
-It's a waste of attention and time.
+It's a waste of attention.
 
 The solution is simple. Fix the seed for the random number
 generator for each test that has randomness. The random
@@ -429,30 +431,35 @@ some fault is introduced.
 The simple solution is sometimes impossible and always
 disappointing. Most programming languages offer the tremendous
 convenience of calling \lstinline!rand()! anywhere in the
-code, which uses a global random number generator. Authors
+code, which uses a global random number generator. Sometimes
+\rlang code calls \lstinline!rand()! and then calls \cpp code
+that calls \lstinline!rand()! from a different random number
+generator. Authors
 of code unfortunately use this convenience, creating side-effects
 for testing. Declaring a specific random number generator
 and passing it to a function gives gives control over the
 choice of random number generator and when its seed is fixed.
 
-It's also possible to greatly reduce the rate of failure
+(It's also possible to greatly reduce the rate of failure
 for a statistical test, even with the same 99\,\% cutoff
-on acceptable results, if we write the test as a hierarchical
-model.
+on acceptable results, if we take the same hundred tests
+and use the statistical framework to treat them as ten sets
+of ten tests.)
 
 Let's say we can fix the seed for a function, and for all the
-functions it calls. The point was to try a lot of runs. We
-can still do this by creating a unit test that is run once
-for a set of seeds, so define a starting seed and run against
+functions it calls. The joy of randomized testing is that more
+runs might yield more faults in the code. We
+can still do lots of runs by creating a unit test that is run once
+for a set of seeds.  The procedure is to define a starting seed and run against
 the next thousand seeds. When the test shows no real faults,
 choose a starting seed for which the next thousand all pass
 the test within some tolerance. This is less simple, but it
 explores the space of tests, and it is likely to signal when
 a real fault arrives.
 
-Accidental determinism is an unexpected source of error for
+(Accidental determinism is an unexpected source of error for
 statistical tests. For instance, a hash-based dictionary may
-order its keys.
+order its keys.)
 
 \subsection{Conclusion}
 
@@ -466,10 +473,13 @@ At the same time, statistical tests are the unit test
 equivalent of checking work with plots. They can find faults
 in places you weren't looking, because they summarize all
 of the outputs of a function, or because they summarize
-the behavior of multiple runs of a function. Testing scientific
-code is rarely (but sometimes!) an absolute assertion that
-the function has no faults, and statistical tests are an
-excellent tool in the utility belt.
+the behavior of multiple runs of a function. For code that
+doesn't have mathematical complexity, unit tests can assert
+that there was some set of parameters for which the output
+of the function was correct. For scientific code, we may
+lack even that, but statistics, like those above and the many
+more not mentioned, assert that a function
+can't be too wrong.
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
@@ -478,23 +488,27 @@ Read through unit tests, and they all have the same form.
 Set up data and parameters to pass to a function. Call the
 function. Compare its output to some known answer, or to
 something known about the answer. Every unit test is two
-functions, the function under test and some equivalent
-calculation by the unit test itself. That equivalent calculation
-may be true only for one set of parameters. It may only
-approximate the answer within a statistically-defined region.
-It will be a hobbled mirror image of the function under test,
-unless you write it to be more.
+functions, the function under test and some parable form
+of that function, written into the unit test itself.
 
+There are times that it's reasonable to write a test version
+of a function, some second, similar way. More often, we write
+a function once using its most obvious, probably slowest, algorithm.
+The obvious algorithm is an excellent unit test on any refinement.
+
+Two implementations of the same model differ based on how early
+in the design they diverge from each other.
 There are three steps to writing a function for scientific software~\citep{dahlgren2005}:
 \begin{enumerate}
   \item Prepare discrete models.
   \item Translate the models into algorithms.
   \item Code the models using programming languages.
 \end{enumerate}
-The function under test made one set of assumptions during
-these stages. By rewriting that function, making a different
-set of assumptions, you test for different kinds of faults
-in the function under test.
+If only the algorithm in the code changes, then the results
+should be quite similar. If the models are discretized differently,
+then they it takes more care to use one for testing of the other.
+Which you choose depends on the kinds of faults you think pose
+the most risk in the code.
 
 The benefit, and threat to efficiency for testing, is that
 parallel implementations of a function can lead to scientific
@@ -518,21 +532,24 @@ or checking properties of the function without checking the function itself.
 
 Let's say we are supposed to calculate the mortality rate
 for five-year age groups from birth to eighty years old,
-for a Gompertz mortality. The function under test is a formula
+for a Gompertz-Makeham mortality law,
+\begin{equation}
+  \mu(x) = \alpha e^{\beta x} + \lambda.
+\end{equation}
+The function under test is a formula
 from a book, once pasted as a \textsc{png} into a Jira story.
-
 That function comes from the putting the Gompertz mortality
 rate into the integral for mortality,
 \begin{equation}
-  {}_nm_x = \frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(\int_{x_n}^s\mu(a)ds)ds}.
+  {}_nm_x = \frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(-\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(-\int_{x_n}^s\mu(a)ds)ds}.
 \end{equation}
 Someone plugged the Gompertz function for $\mu(x)$ into this
 formula in order to get the equation in the book.
 
-We can check the code by implementing the function a second
-time, where the new version does the integrals in the equation
+We can check the code with a parallel implementation,
+where the new version does the integrals in the equation
 above. It will be very slow by comparison, but the answer should
-be the same within $10^{-7}$ if we are working in double precision.
+be the same within single precision if we are working in double precision.
 
 This isn't a change to the model. It's a change to the 
 mathematical representation of the model, because the mortality
@@ -719,14 +736,15 @@ result from that function. The parallel implementation, in this case,
 is the previous version of the same function.
 
 There is a book called \emph{Release It!} that says we should
-``make regression testing easy''~\cite{nygard2018release}. It's hard to make it easy
+``make regression testing easy,''~\cite{nygard2018release}. It's hard to make it easy
 because unit tests are built to test, not save output. Even if
 they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
 is a data frame, did every value change, or some subset?
 
 While the book's advice is a research project, in its own right,
-it's a good focus for any particular project. Unit tests are
+it's a good focus for any particular project to find places in the
+code where regression tests would be most informative. Unit tests are
 most absolute in their pronouncement when they test the simplest
 functions. It's the mid-level functions, that do the more work
 and produce the most complex output, that benefit from regression.
@@ -769,7 +787,7 @@ sets are equivalent in terms of the mathematical statement of
 the model, but their representation in code makes one set
 have a different risk from another, for instance, due to
 denormalization. It can also be the other way around, that
-the mathematical statement of a model makes clear what paramater
+the mathematical statement of a model makes clear what parameter
 sets may be equivalent. Information from both statements of
 a function will be helpful.
 
@@ -1073,7 +1091,7 @@ for recording and conveying this work, the create-read-update-delete
 \begin{itemize}
 \item \textbf{Create} - If the input data doesn't have excess mortality,
   then derive it from cause-specific mortality and prevalence.
-\item \textbf{Read} - If the user specifies \texttt{get\_csmr}, then get cause-specific
+\item \textbf{Read} - If the user specifies \lstinline!get_csmr!, then get cause-specific
   mortality from the database and add it to the data.
 \item \textbf{Update} - Use the average of incidence data at all child
   locations because it tends to be sparse.
