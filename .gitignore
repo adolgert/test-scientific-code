@@ -112,3 +112,4 @@ venv.bak/
 *.fls
 *.synctex.gz
 *.toc
+*.xdv
