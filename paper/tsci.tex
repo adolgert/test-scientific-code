@@ -242,13 +242,46 @@ that's probably a huge error. If it's the end of a long calculation,
 or if it's the kind of calculation that divides by a small number somewhere,
 then it could be fine.
 
-This discussion is very close to a math problem called ill-conditioning,
-which means that some calculations look perfectly fine on paper
-but, for certain inputs, will yield wildly incorrect results due
-to rounding error. We can't go into depth about that here, but notice
-that a unit test for the function can see that there
-is a problem with the output. It can tell you when there is a problem
-that requires numrical analysis.
+
+\subsection{Discovering numerical analysis}
+There are many cases where the representation of floating point
+creates problems for math in code. Take, for example, calculation
+of the mean age of death, for a model that assumes constant
+mortality across an interval.
+\begin{equation}
+  a_x^{cm} = \frac{1}{m_x} - \frac{n_x e^{-m_x n_x}}{1-e^{-m_x n_x}}
+\end{equation}
+A straightforward implementation in Julia looks close to the equation,
+except that this language uses periods to denote elementwise
+operations.
+\begin{lstlisting}
+function constant_mortality_mean_age(mx, nx)
+    expx = exp.(-mx .* nx)
+    (1 ./ mx) .- (nx .* expx) ./ (1 .- expx)
+end
+\end{lstlisting}
+There is a problem as $m_x\rightarrow 0$. This equation should
+approach $a_x=0.5,$ but it loses precision as the denominator
+nears zero.
+
+If we hadn't looked at the equation in detail, but we had implemented
+tests that probe the range of possible input values, then
+we would see the numerical problem arise.
+\begin{lstlisting}
+mx = [1.0, 0.9, 0.1, 1e-2, 1e-14, 0.0]
+nx = ones(size(mx))
+ax = constant_mortality_mean_age(mx, nx)
+@assert all(ax .< .5)
+for check in 2:length(ax)
+    @assert ax[check] > ax[check - 1]
+end
+\end{lstlisting}
+This test asserts that the values get closer to 0.5 from below.
+
+The unit test won't tell you how to fix the problem.
+(In this case, it's as easy as using a Taylor series near
+$m_x=0$.) It can show places where more numerical analysis is
+needed in order to have a stable representation of the math.
 
 
 \subsection{Factors Are Many Parameters}
