@@ -281,8 +281,10 @@ This test asserts that the values get closer to 0.5 from below.
 Not only will the value at 0.0 yield a \nan, but also
 values before then return in the thousands or \textsc{Inf}.
 Once you see the problem in the unit test, it's possible
-to rearrange the equation to use a function that avoids
-division by zero, for instance, the Langevin function.
+to rearrange the equation to avoid
+division by zero. In this case, the distance from the limiting
+value of $n_x/2$ is the Langevin function, which has excellent
+limiting forms near zero.
 \begin{lstlisting}
 function constant_mortality_mean_age(mx, nx)
     (nx / 2) .* (1 .- langevin.(mx .* nx / 2))
@@ -293,47 +295,6 @@ This equation is stable near zero mortality rate.
 The unit test won't tell you how to fix the problem.
 It can show places where more numerical analysis is
 needed in order to have a stable representation of the math.
-
-
-\subsection{Factors Are Many Parameters}
-\aside{Seems should go in section 5.}
-We talked about combinatorial testing of parameters
-in Sec.~\ref{sec:parameter-logic}. That section was talking about
-parameters that are boolean, or ternary, or one value of ten.
-A double can take on about $10^{19}$ different values. A single
-can take on about $10^9$ different values. We can't treat them
-like other parameters.
-
-Except that there are some cases where a small function,
-such as calculating Hilbert curves or quadtrees, is fast-enough
-that you can run through every single binary representation of
-a single-precision floating point. Thats $2.1\times 10^9$ floating
-point values at $3\:\mbox{GHz}$, for a function that takes
-$\sim 100\:\mbox{clock cycles}$. That comes out to $71\:\mbox{seconds}$
-to try every possible number. This does not work for doubles.
-
-More practically, for a single number you have to look at
-the specific problem and identify edge cases for that number.
-Maybe the edge case is near zero or one. Put on your scientist
-hat, and make guesses. Then test two things: the value at the
-edge case and the value approaching the edge case from positive
-and negative sides.
-
-If a parameter is a vector of numbers, what to test depends
-even more on the particular math. Some suggestions:
-\begin{enumerate}
-    \item Set all values to a single edge case.
-    \item Try monotonically-increasing or decreasing.
-    \item Try non-increasing or non-decreasing (so that some
-    consecutive values are the same).
-    \item End points may be special, so test them separately.
-    \item If the vector is, in some way, smooth, construct
-    a vector where the maximum change, element to element, is no
-    more than some prescribed value. See how large that value can
-    be before the function fails.
-\end{enumerate}
-\aside{Stratify domain.}
-
 
 
 \section{Statistics for Testing}\label{sec:statistical}
@@ -807,40 +768,67 @@ the mathematical statement of a model makes clear what parameter
 sets may be equivalent. Information from both statements of
 a function will be helpful.
 
-A decision table enumerates sets of inputs and desired outputs for each set.
-For example, if a variable can be 0, 1, or 2, then there are three possible
-inputs. The chart would be three lines long. If the function were $2^n$,
-the chart might be
+A decision table is a list of parameters and the expected result
+of the function, arranged with one unit test per row. The
+tests can exhaust all possible parameter combinations or
+can have a row per equivalence class, when the number of combinations
+becomes large.
 
+For instance, consider a function that projects a time series
+using the trend of its running average. It could use the slope
+of the last $m$ entries in the time series. It could weight
+those last $m$ entries according to an exponential or Gaussian, so that
+earlier entries count less. It could transform the entries
+into log-space before projecting them. These options create
+sets of allowed parameters.
 \begin{center}
-\begin{tabular}{|l|l|}\hline
-power & output \\ \hline
-0 & 1 \\
-1 & 2 \\
-2 & 4 \\ \hline
+\begin{tabular}{|l|l|l|l|l|}\hline
+$m$ & kernel & transform & range & output \\ \hline
+5 & Gaussian & linear & 1.0 & 2.7 \\
+5 & Gaussian & logarithmic & 2.0 & 1.9 \\
+5 & exponential & linear & 3.0 & 2.8 \\
+5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
 \end{tabular}
 \end{center}
-
-If we add a parameter that says whether the variable is positiver or negative,
-then the decision tree has $3\times 2$ rows,
-
+The clear table is pleasing, but we can see that, even for
+this small case, the list will be long. The example
+above doesn't even begin to probe error conditions, such
+as negative $m$ values or $m$ greater than the length
+of the data. We might define equivalence classes for each
+parameter, such as these.
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
-power & positive &output \\ \hline
-0 & T & 1 \\
-1 & T & 2 \\
-2 & T & 4 \\
-0 & F & 1 \\
-1 & F & 1/2 \\
-2 & F & 1/4 \\ \hline
+parameter & \# cases & cases \\
+$m$ & 5 & negative, 0, less than data, equal to data, more than data \\
+kernel & 2 & Gaussian, exponential \\
+range & 3 & negative, 0, positive \\
+transform & 2 & linear, logarithmic \\ \hline
 \end{tabular}
 \end{center}
+That makes $5 \times 2 \times 3\times 2 = 60$ cases.
+The table also fails to mention the most important
+parameter, the vector of data values.
 
-This is great, but the list gets big because the options multiply.
-In the example here, we knew the exact answers.
-When there are more cases, you may only be able to \aside{specify properties} of the
-answer as a function of the parameters. It's a weaker check,
-but it could help.
+If a parameter is a vector of numbers, what to test depends
+even more on the particular math. Some suggestions:
+\begin{enumerate}
+    \item Set all values to a single edge case.
+    \item Try monotonically-increasing or decreasing.
+    \item Try non-increasing or non-decreasing (so that some
+    consecutive values are the same).
+    \item End points may be special, so test them separately.
+    \item If the vector is, in some way, smooth, construct
+    a vector where the maximum change, element to element, is no
+    more than some prescribed value. See how large that value can
+    be before the function fails.
+    \item Orthogonal arrays are random draws of values that
+    are spread out evenly through a multidimensional space.
+    They are one way to explore the space of input arrays~\citep{Owen1992}.
+\end{enumerate}
+Each of these suggestions becomes another category for
+equivalent inputs. If we used these five, then the total
+number of tests above would be $60\times 6 = 360$.
+
 
 \subsection{Limiting values of parameters}\label{sec:limits}
 
@@ -886,94 +874,120 @@ the limiting value, as a function of $x$.
 
 \subsection{Test Case Generation}
 \aside{By-hand versus complete cases}
-Could we tell the testing framework about our input parameters
-and let it do \emph{automatic test case generation?}
-If we test a function by supplying every combination of inputs,
-it's called \emph{combinatorial interaction testing.}
-The number of tests generated can be large, even for few parameters.
-That can make it difficult to supply all of the expected results.
-If we could exclude parameter combinations that definitely fail
-or are uninteresting, there would be many fewer tests.
+When we decide to use test-driven design, we start each bout of
+coding by writing a test that mimics user input, and then we write
+code until the application responds correctly to the user.
+This is a high-level test, and it's an example of a test that
+has many parameters because, for a scientific application, it
+usually corresponds to adding a user-specified option to the
+sum of the input data and configuration files. There is no
+way to try every combination of inputs, and the application
+may take a long time to run.
 
-The fraction tested, of all possible inputs, is \emph{test coverage.}
-If test exercise every possible input for each parameter, separately,
-that's depth-1 coverage. If all pairs of inputs are tested, that's
-depth-2 coverage. It's usually good to prioritize lower-depth coverage
-before higher-depth coverage. What are the main practical
-approaches to generating tests with good coverage up to some depth?
+The luxury of combining every combination of input parameters
+is called \emph{combinatorial interaction testing.} We usually
+test some fraction of these possible inputs, called the
+\emph{test coverage fraction,} not to be confused with the
+term \emph{test coverage,} that refers to the percentage of
+all code paths that are run at least once by any unit test.
 
-\subsubsection{Random Parameter Choices}
-Given a set of possible values for each parameter, use a random
+How we choose which, of all possible tests, to run is a question
+of test design, the same way a doctor designs a randomized
+controlled trial or a botanist chooses treatments of plants
+in a field. Let's look at how the most common choices
+address risks in the code most efficiently.
+
+
+\subsubsection{Random parameter choices}
+Given a set of possible equivalence classes for each parameter, use a random
 number generator to choose one of each. Do this as many times
-as runtime allows. (Can I find expected coverage as a function of
-random draws?) The Python tool, \texttt{Hypothesis,} uses this
-method. \aside{example}
+as runtime allows. When using this method, it's critical to
+report not only failing tests but also the exact set of parameters
+that made the tests fail.
 
-\subsubsection{Combinatorial Excursions}
+Randomized test cases are easy to implement, and they can
+supplant the author's duty to identify the greatest risks
+in the code. The main drawback is time to run this kind of
+test, especially because it's tempting to play the lottery
+by letting it keep running.
+
+
+\subsubsection{Combinatorial excursions}
 If you decide that there is some most-common way to call
 the function, set that as the baseline. Then loop over parameters,
-trying values for each one. Then loop over pairs of parameters.
-Then sets of three. These tests would be highly-biased
-towards that baseline parameter set. \aside{example}
+trying all equivalence classes for each one. Then loop over pairs of parameters. Then sets of three. You define a limiting depth,
+where the full combinatorial excursion is the case where the
+limiting depth is the number of parameters.
 
-\subsubsection{All Pairs}
-There may be software available to generate tests which
-include all pairs of input parameters.
-I suggest using a library because generating tests that have
-all pairs can be tricky to do well.
-The Pairwise website lists libraries in
-various languages~\cite{Pairwise}. For instance, AllPairsPy
-does this for Python~\cite{allpairspy}.
-An example all-pairs algorithm is in~\citet{tung2000automating}.
-How to write such an algorithm is covered in professional
-textbooks on software testing, such as~\citet{pezze2008}.
-Two Microsoft articles might be a friendly start to writing
-one yourself~\citep{blass2002,czerwoka2006}.
-
-\aside{example, and describe limitations}
+These tests would be highly-biased towards that baseline parameter set.
+It can make sense to define several most-important baseline
+parameter sets from which to conduct combinatorial excursions.
 
 
-\subsubsection{Stratification and Filtering}
-It helps a lot to select subsets of the parameter
-space that must be run or that can be ignored. This work
-is largely done by hand. Maybe you set the value of one parameter
-and then use an automated tool to generate the rest of
-the parameters given that one value. This stratification
-can halve the number of tests without increased risks.
-Python's Hypothesis helps build stratified tests.
+\subsubsection{All pairs}
+What if we could guarantee, that if we pick any two parameters
+of a function, and we pick two values for those parameters,
+that there is at least one unit test that includes that combination
+of parameters? This is the all-pairs test design, to test
+every possible pairwise interaction among parameters.
+It packs these into as few tests as possible. For instance,
+the same unit test might be the only time that pair
+$(a=1, b=2)$ and pair $(c=3, d=4)$ appear, because their
+pairwise interaction appeared in the same test.
 
-There are also two kinds of filtering you can do on 
-generated test cases. You can exclude tests for combinations
-of parameters that violate preconditions of the function.
-You can also filter out tests that you feel are less risky.
-These latter, soft conditions, make sense when you can
-look inside the code in order to assess risk.
+All-pairs testing offers a feeling of completeness while
+using many fewer tests than even a depth-2 combinatorial
+excursion. There are claims that all-pairs testing almost
+always finds every fault in a function that full combinatorial
+excursions would fine~\citep{Pairwise}. It does not, however,
+do any better a job than the randomized testing of emphasizing
+particular parameter sets that the author decides carry
+the most risk for a function or application.
 
-Together, stratification and filtering reduce the total number
-of tests to run so that they focus on the highest risks
-in the shortest time.
+The trick to using all-pairs testing is finding a library
+that will compute the sets of parameters to use. Finding
+those sets is, itself, an optimization problem.
+While AllPairsPy works for Python~\citep{allpairspy},
+and several papers cover algorithms~\citep{tung2000automating,pezze2008},
+there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
+
+
+\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
+The sections above all imply that there could be some way
+to emphasize which test are chosen, based on an assessment
+of which parameters carry the most risk. For instance, if
+a parameter is an option to make a copy of the input data
+before further work, it would be enough to test that exactly
+once, and not in all other parameter combinations. On
+the other hand, there may
+be certain parameter values that should be thoroughly-tested
+because they challenge the numerical precision of the algorithm.
+
+The ability to prefer tests of certain sets of parameter values
+is called \emph{stratification.} That means you take any
+of the test generation methods above and give the test author
+the ability to weight which tests it should generate.
+
+The throw out some of the generated tests is called
+\emph{filtering.} Sometimes it's easier to generate tests
+and toss useless ones than it is to generate the most-desired
+tests in the first place.
+
+Some of the more professional testing software includes
+these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
+\textsc{cts}~\citep{hartman2004problems},
+and the \textsc{act} library~\citep{kuhn2008automated}.
+
 
 \subsubsection{All Other Methods}
-If each run of a test takes a long time, it might be worthwhile
-to choose tests yet more wisely than any method listed above.
-To understand the problem, I recommend reading~\citet{petke2015practical}.
-
-
-\emph{Orthogonal arrays} are a way to construct random draws
-of parameters that can be shown to be more spread out through
-the space of all possible draws. Generating orthogonal arrays
-appears to be difficult, so people start by looking up the
-needed array in a repository and then use that to generate
-test cases~\citep{Owen1992}.
-
-There are a couple of libraries or web services that offer
-to generate test cases. \textsc{aetg} uses a greedy algorithm~\citep{cohen1997aetg}.
-The automated combinatorial test methods (\textsc{act}) library
-is also greedy~\citep{kuhn2008automated}.
-The combinatorial testing services library (\textsc{cts})
-uses simulated annealing to find good test cases~\citep{hartman2004problems}.
-
-There are survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
+The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
+are yet another way to generate tests that span the space of
+all possible parameters~\citep{Owen1992}.
+Whichever method you choose, it's
+good to have one of these methods available when it's time to
+do user-level testing on scientific code.
+\citet{petke2015practical} cover these strategies in their book,
+and there are a few survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
 
 
 \subsection{Example}
