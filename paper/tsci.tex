@@ -1,3 +1,4 @@
+%!TEX program = xelatex
 \documentclass[fleqn,10pt]{olplainarticle}
 % Use option lineno for line numbers 
 \usepackage{xcolor}
@@ -50,18 +51,20 @@
 
 \begin{document}
 \lstset{
-  basicstyle=\footnotesize\ttfamily,
   style=FiraCodeStyle,
+  basicstyle=\footnotesize\ttfamily,
   %backgroundcolor=\color{green!20}
   }
 
 \begin{abstract}
-Scientific code has a lot of math. Mathematical code can be tough to test
-because it may not have a known answer, because the math is arcane, or because
-it's complex. It's also tough to test because you have to combine programming
-skill and math skill. This article doesn't show you how to set up unit testing
-in R or Python or Julia. It doesn't cover numerical analysis. It shows you which
-traits of an equation can confirm that its implementation in code is correct.
+When we write code to do science, even though we have purposefully
+chosen each step of the code, we may not know what the exact result should be.
+Not having an exact right answer makes unit testing both complicated and
+critical to trusting the scientific results. This article doesn't show how
+to set up unit testing in \rlang, Python, or Julia. It doesn't cover numerical
+analysis. It shows how to put boundaries on the behavior of mathematical
+code. Some techniques are adaptations of traditional unit testing methods
+and others are particular to testing scientific code.
 \end{abstract}
 
 % From Mike Richards
@@ -90,14 +93,14 @@ the risk of failure in these functions. When a model is supposed to represent
 a subtle behavior of the world, testing that its output is correct feels
 like an existential assertion.
 
-However scientific models, and the functions that comprise them,
+However, scientific models, and the functions that comprise them,
 always have behavior we can discover, characterize, and assert in a unit
 test. Some of that behavior is approximate, that the result be near a
 value. Some is exact, in a limit or at a boundary.
 
 Assuming we've read a good unit testing book like \cite{jorgensen2013},
 and that we can figure out, elsewhere, the construction of unit tests
-in code, let's assess the risks that are unigue to scientific code.
+in code, let's assess here the risks that are unigue to scientific code.
 Let's look at how the tools we already know can address those risks
 and how some new tools might help when the stakes are high.
 
@@ -114,23 +117,16 @@ Others are surprising, like the failure of an equality test.
 \subsection{Floating Point Exceptions}
 I shouldn't even say that division by zero is a simple failure.
 One part of it is simple, that almost every language follows the
-\ieee~754 standard. There is a sweet little book by~\cite{overton2001numerical},
-that describes both the \ieee~754 standard
-and some common implications for how you write equations in code.
-The complicated part is that the standard permits the application, compiler,
-and even operating system to make choices about how the same division
-by zero will behave. Then it allows different ways to report the problem.
+\ieee~754 standard.
+A little book called \emph{Numerical computing with IEEE floating point arithmetic}
+describes both the \ieee~754 standard
+and some common implications for how you write equations in code~\citep{overton2001numerical}.
+The complicated part is that the application, compiler,
+and even operating system act as filters to decide whether the same division
+by zero will raise an exception, return infinity, or silently return not-a-number (\nan).
 
-What will this do when \texttt{x=0}?
-\begin{lstlisting}
-def f(x): return 1 / x
-
-def test_f():
-    y = f(0)
-    assert(is_infinite(y))
-\end{lstlisting}
-
-According to \ieee~754, there are five exceptions that a floating-point
+According to \ieee~754, the lowest level of those filters begins
+as one of five exceptions that a floating-point
 operation, such as multiplication or addition, can raise. These aren't the
 same as \cpp exceptions, but they are what the \cpu reports when
 it has a problem, and they can bubble up to your code to become a
@@ -139,7 +135,8 @@ language-level exception.
     \item \emph{Invalid operation}---The square root of a negative
     number, or zero divided by zero. Results in a \nan, which means
     ``not a number.''
-    \item \emph{Division by zero}---Results in plus or minus infinity.
+    \item \emph{Division by zero}---Results in plus or minus infinity most
+    of the time.
     \item \emph{Overflow}---When an operation results in a number
     too large to represent, this can result either in infinity
     or the largest representable number, depending on settings.
@@ -162,12 +159,20 @@ maximal speed and correctness. It does fancy tricks with rounding
 and handling of very small numbers. However, it also offers
 careful handling of delicate calculations.
 
-So what I do is write a test of the assumptions my code relies on.
+So what I do is read \cite{overton2001numerical} and write tests
+of the assumptions my code relies on.
 For instance, if a Python Pandas data frame returns a \nan when it
 takes a square root of a negative number, and my code relies that behavior,
-then I make a test that runs negative data through the code. The risk
-is that some part of the software stack, from Pandas to Python, to
-Windows, will make some choice that changes the behavior that I see today.
+then I make a test that runs negative data through the code.
+\begin{lstlisting}[language=Python]
+def test_f():
+    df = pd.DataFrame({"a": [3.0, -3.0]})
+    df.b = np.sqrt(df.a)
+    assert(np.isnan(df.b[1]))
+\end{lstlisting}
+The risk is that some part of the software stack, from Pandas to Python, from
+Windows to someone else's installation of Windows,
+will make some choice that changes the behavior that I see today.
 
 
 \subsection{When Are Floats Equal?}
@@ -188,14 +193,14 @@ pattern that represents a \nan is the same in all cases.
 One implementation embedded someone's birthday in the \nan bits.
 You can, however, ask if infinity
 is equal to infinity. You can also ask if
-$-0=0$, and that will be true. Rely on \lstinline!is.nan! and
+\lstinline!-0==0!, and that will be true. Rely on \lstinline!is.nan! and
 \lstinline!is.infinite!, or their equivalents in your language.
 
 Comparison of two floating points, the regular kind that aren't
 infinite or \nan, has its own problem. If you set
-$x = 3.0$ and $y=9.0 / 3$, then you will probably find they
+\lstinline!x = 3.0! and \lstinline!y=9.0 / 3!, then you will probably find they
 aren't equal. At least, \lstinline!x==y! will fail most times, because
-they floating point math is usually approximate. We test for this
+floating point math is usually approximate. We test for this
 using a value called \emph{machine epsilon.} Every language defines
 this value. It is the least difference between the
 mantissa of two numbers.
@@ -203,12 +208,12 @@ mantissa of two numbers.
 Every floating-point number is expressed as a mantissa times
 an exponent. It's always of the form $1.m \times 2^e$, where
 $m$ is a bunch of digits after the 2 and $e$ is the exponent
-for the power of 2. There's a digit for the sign, too.
+for the power of 2. There's a bit for the sign, too.
 Machine epsilon is the smallest difference in the mantissa,
 excluding the exponent, so if you want to test that two
 floating point numbers are equal, you test relative error using
 machine epsilon.
-\begin{lstlisting}
+\begin{lstlisting}[language=R]
 n <- 4
 same <- x * (1 + n * machine_epsilon) > y && x * (1 - n * machine_epsilon) < y
 \end{lstlisting}
@@ -237,60 +242,64 @@ that's probably a huge error. If it's the end of a long calculation,
 or if it's the kind of calculation that divides by a small number somewhere,
 then it could be fine.
 
-This discussion is very close to a math problem called ill-conditioning.
-It means that some calculations look perfectly fine on paper
-but, for certain inputs, will yield wildly incorrect results due
-to rounding error. I can't go into depth about that here, but notice
-that, if I make a unit test for the function, I can see that there
-is a problem with the output under some circumstance and begin 
-to unravel it.
 
+\subsection{Discovering numerical analysis}
+There are many cases where the representation of floating point
+creates problems for math in code. Take, for example, calculation
+of the mean age of death, for a model that assumes constant
+mortality across an interval.
+\begin{equation}
+  a_x^{cm} = \frac{1}{m_x} - \frac{n_x e^{-m_x n_x}}{1-e^{-m_x n_x}}
+\end{equation}
+A straightforward implementation in Julia looks close to the equation,
+except that this language uses periods to denote elementwise
+operations.
+\begin{lstlisting}
+function constant_mortality_mean_age(mx, nx)
+    expx = exp.(-mx .* nx)
+    (1 ./ mx) .- (nx .* expx) ./ (1 .- expx)
+end
+\end{lstlisting}
+There is a problem as $m_x\rightarrow 0$. This equation should
+approach $a_x=0.5,$ but it loses precision as the denominator
+nears zero.
 
-\subsection{Factors Are Many Parameters}
-\aside{Seems should go in section 5.}
-We talked about combinatorial testing of parameters
-in Sec.~\ref{sec:parameter-logic}. That section was talking about
-parameters that are boolean, or ternary, or one value of ten.
-A double can take on about $10^{19}$ different values. A single
-can take on about $10^9$ different values. We can't treat them
-like other parameters.
+If we hadn't looked at the equation in detail, but we had implemented
+tests that probe the range of possible input values, then
+we would see the numerical problem arise.
+\begin{lstlisting}
+mx = vcat([0.9 * 10.0^i for i in 0:-1:-17], [0.0])
+nx = ones(size(mx))
+ax = constant_mortality_mean_age(mx, nx)
+println(ax)
+for check in 2:length(ax)
+    @assert ax[check] > ax[check - 1]
+end
+@assert all(ax .< .5)
+\end{lstlisting}
+This test asserts that the values get closer to 0.5 from below.
+Not only will the value at 0.0 yield a \nan, but also
+values before then return in the thousands or \textsc{Inf}.
+Once you see the problem in the unit test, it's possible
+to rearrange the equation to avoid
+division by zero. In this case, the distance from the limiting
+value of $n_x/2$ is the Langevin function, $L(x) = \mbox{coth}(x) - 1/x$,
+which has well-known limiting forms near zero.
+\begin{lstlisting}
+function constant_mortality_mean_age(mx, nx)
+    (nx / 2) .* (1 .- langevin_function.(mx .* nx / 2))
+end
+\end{lstlisting}
+This equation is stable near zero mortality rate.
 
-Except that there are some cases where a small function,
-such as calculating Hilbert curves or quadtrees, is fast-enough
-that you can run through every single binary representation of
-a single-precision floating point. Thats $2.1\times 10^9$ floating
-point values at $3\:\mbox{GHz}$, for a function that takes
-$\sim 100\:\mbox{clock cycles}$. That comes out to $71\:\mbox{seconds}$
-to try every possible number. This does not work for doubles.
-
-More practically, for a single number you have to look at
-the specific problem and identify edge cases for that number.
-Maybe the edge case is near zero or one. Put on your scientist
-hat, and make guesses. Then test two things: the value at the
-edge case and the value approaching the edge case from positive
-and negative sides.
-
-If a parameter is a vector of numbers, what to test depends
-even more on the particular math. Some suggestions:
-\begin{enumerate}
-    \item Set all values to a single edge case.
-    \item Try monotonically-increasing or decreasing.
-    \item Try non-increasing or non-decreasing (so that some
-    consecutive values are the same).
-    \item End points may be special, so test them separately.
-    \item If the vector is, in some way, smooth, construct
-    a vector where the maximum change, element to element, is no
-    more than some prescribed value. See how large that value can
-    be before the function fails.
-\end{enumerate}
-\aside{Stratify domain.}
-
+The unit test won't tell you how to fix the problem.
+It can show places where more numerical analysis is
+needed in order to have a stable representation of the math.
 
 
 \section{Statistics for Testing}\label{sec:statistical}
 
 \subsection{Randomized calculations should give different answers each time}
-
 
 A simple Gaussian elimination can benefit from random pivoting.
 A function to sample a distribution is supposed to return a new value
@@ -300,7 +309,7 @@ so they can insist that the caller not expect a given order
 in the output. All of these perfectly useful functions
 thwart using simple lookup tables to test their output.
 
-The tests, themselves, can even be the problem when we randomly
+The tests, themselves, can be the problem when we randomly
 generate test cases. I'll check
 a life expectancy function against a corpus of life expectancies
 for every country. I'll randomly generate user input
@@ -313,7 +322,7 @@ to heap our uncertainty into a single, tidy number.
 Others are formal statistical
 tests. They take a clear side-effect of a function,
 its randomness, and tame it to measurable uncertainty.
-
+Let's look at just a few examples.
 
 \subsection{Approaches}
 \begin{figure}
@@ -331,6 +340,13 @@ between the two.
 The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
 It takes the whole set of values and reduces it to one number I can assert must be less than some value.
 
+When values range from small to large, it's convenient to use
+relative error instead of absolute error.
+\begin{equation}
+  \mbox{relerr} = \frac{\hat{Y}_i - Y_i}{Y_i}
+\end{equation}
+The known value is always in the denominator.
+
 Even more reassuring for a unit test, I can take all of the
 sets of values and take the maximum absolute error,
 $\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
@@ -342,17 +358,24 @@ When there is just one vector of random numbers coming out
 of a function, it can be helpful to characterize how far
 they are from their average value. The variance is
 the average of how far each value is from the average of all
-values, but you'd never calculate it. It's always avaiable
+values,
+\begin{equation}
+  \mbox{var}(Y) = \frac{1}{N}\sum_i (Y_i - \bar{Y})^2,
+\end{equation}
+but you'd use the always-avaiable
 as \lstinline!var! or \lstinline!variance! in any language.
-The standard deviation is the square root of this.
+The standard deviation is the square root of variance.
 
-If there's no variance, then every value in the vector is
-the same. If the variance keeps getting larger when the
-function is run again to make longer outputs, there is a
-chance that's \textsc{ok}. Some distributions, such as the Cauchy
-distribution, don't have a variance.
+If variance is zero, then every value in the vector is
+the same. There are some functions, such as the Cauchy
+distribution, that don't have a variance. For such a function,
+the value of the variance will keep increasing as the
+number of draws of the function increases, instead of
+converging to a single value. This, in itself, is a
+testable property of a function.
 
-\subsubsection{Standard deviation}
+
+\subsubsection{Confidence interval}
 
 Assume there is a function with randomness, that produces floating-point numbers. Those results
 have some average value, but they vary around that average value.
@@ -374,7 +397,7 @@ want to make some cutoff on which results are acceptable,
 we want to choose a cutoff that is informative, so it's
 close to the average good value. On the other hand, we don't
 want it to fail a lot. The standard deviation tells us
-how much we're pushing our luck in either direction.
+how much push luck in either direction.
 
 \subsubsection{Pearson coefficient}
 Let's say the output of a function is a set of $y$ values,
@@ -394,11 +417,13 @@ r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x
 \end{equation}
 It conveniently generalizes to more dimensions.
 
-If life should be more precise than this, then the Pearson
-coefficient is maddening. But consider that it quickly
-determines whether the output rises or falls with the input,
+The Pearson coefficient is a handy, if imprecise,
+set of guard rails on the behavior of a function.
+It quickly determines whether the output rises or falls with the input,
 even in the presence of noise. It can say whether the output
 isn't linear enough, or whether it's too linear.
+It even has a multidimensional generalization for data that
+has multiple $x$ and $y$ values.
 
 
 \subsection{Taming randomness}
@@ -407,7 +432,7 @@ I make tests with random inputs, so they explore more alternative
 paths in the code than I might guess. I run tests of random
 functions a thousand times so that they have more chances to
 show a real bug. Randomness in testing is a free source for
-finding faults and it's a constant headache.
+finding faults, and it's a constant headache.
 
 In order to use the statistical tests above, I need to choose
 a cutoff on what is a passing test and what is a failing test.
@@ -417,7 +442,7 @@ interval, it will fail 5\,\% of the time. Even for a
 99.9\,\% confidence interval, it will fail once in a thousand
 tries. This means the green lights of a unit test display will
 be red without reason once in a thousand times, but that's
-enough not to pay attention to a red light. It's enough to
+enough not to pay attention to a red light. It's a lure to
 rerun the test suite every time there is any red light.
 It's a waste of attention.
 
@@ -436,9 +461,9 @@ code, which uses a global random number generator. Sometimes
 that calls \lstinline!rand()! from a different random number
 generator. Authors
 of code unfortunately use this convenience, creating side-effects
-for testing. Declaring a specific random number generator
-and passing it to a function gives gives control over the
-choice of random number generator and when its seed is fixed.
+for testing. Only sometimes can we make a repeatable
+stream of random numbers by declaring a specific random number generator
+and passing it to a function.
 
 (It's also possible to greatly reduce the rate of failure
 for a statistical test, even with the same 99\,\% cutoff
@@ -454,12 +479,8 @@ for a set of seeds.  The procedure is to define a starting seed and run against
 the next thousand seeds. When the test shows no real faults,
 choose a starting seed for which the next thousand all pass
 the test within some tolerance. This is less simple, but it
-explores the space of tests, and it is likely to signal when
+explores the space of tests and is likely to signal when
 a real fault arrives.
-
-(Accidental determinism is an unexpected source of error for
-statistical tests. For instance, a hash-based dictionary may
-order its keys.)
 
 \subsection{Conclusion}
 
@@ -467,46 +488,49 @@ Some kinds of unit tests are absolute. When they pass,
 there is no fault in this one path through the function.
 Statistical tests don't give that guarantee. The function
 under test could be close-enough to the desired value but
-still have a fault in some path.
-
-At the same time, statistical tests are the unit test
-equivalent of checking work with plots. They can find faults
+still have a fault in some code path.
+At the same time, statistical tests can find faults
 in places you weren't looking, because they summarize all
-of the outputs of a function, or because they summarize
-the behavior of multiple runs of a function. For code that
-doesn't have mathematical complexity, unit tests can assert
-that there was some set of parameters for which the output
-of the function was correct. For scientific code, we may
-lack even that, but statistics, like those above and the many
-more not mentioned, assert that a function
-can't be too wrong.
+of the outputs of a function or because they summarize
+the behavior of multiple runs of a function.
+
+If we were testing a typical function, for which we knew the
+right answer, that unit test would offer the meager assurance that,
+for one set of parameters, the function is correct.
+Statistical tests, like those above and many more statistical
+tests not mentioned, can assert that, for one set of parameters,
+a function isn't too wrong.
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
-\subsection{Write it Twice}
+\subsection{Write it Twice}\label{sec:parallel-twice}
 Read through unit tests, and they all have the same form.
-Set up data and parameters to pass to a function. Call the
-function. Compare its output to some known answer, or to
+They set up data and parameters to pass to a function, call the
+function, and either compare its output to some known answer or to
 something known about the answer. Every unit test is two
-functions, the function under test and some parable form
+functions, the function under test and a parable
 of that function, written into the unit test itself.
 
 There are times that it's reasonable to write a test version
-of a function, some second, similar way. More often, we write
-a function once using its most obvious, probably slowest, algorithm.
+of a function, some second, similar way. In fact, we most often write
+a function first using its most obvious, probably slowest, algorithm.
 The obvious algorithm is an excellent unit test on any refinement.
 
-Two implementations of the same model differ based on how early
-in the design they diverge from each other.
-There are three steps to writing a function for scientific software~\citep{dahlgren2005}:
+We can find an appropriate parallel implementation for testing by
+looking at the set of choices we make when writing the original function
+and asking, at which step should the second implementation differ
+from the first.
+\cite{dahlgren2005} describe three steps to writing a function for
+scientific software, and we'll add one step before theirs.
 \begin{enumerate}
+  \item Represent the mathematical model.
   \item Prepare discrete models.
   \item Translate the models into algorithms.
   \item Code the models using programming languages.
 \end{enumerate}
 If only the algorithm in the code changes, then the results
 should be quite similar. If the models are discretized differently,
-then they it takes more care to use one for testing of the other.
+then it takes more care to use one for testing of the other.
 Which you choose depends on the kinds of faults you think pose
 the most risk in the code.
 
@@ -518,13 +542,15 @@ especially to use of parallel implementations, so let's
 look at how alternative choices probe faults in code.
 
 \begin{callout}
-\textbf{The Oracle Problem}---Sometimes
-we don't know what the result of a function should be. That's called
-the oracle problem. It's a unique feature of mathematical code that
-the best information on what a function should return is the function you just
-put in your code. Testing methods below circumvent the oracle problem
-by finding simpler inputs, comparing results with another implementation,
-or checking properties of the function without checking the function itself.
+\textbf{The Oracle Problem}---
+Imagine that there were some source to tell you what the answer to a function
+should be. It could be a software engineering support tool, or it could
+be your scratchwork on a notepad. This source is known as an
+oracle~\citep{howden1986functional}, and its absence for scientific code
+is the oracle problem~\citep{sirer1999using}. Despite the name, this
+is hardly a tragedy because testing methods can 
+finding simpler inputs, compare results with another implementation,
+or check properties of the function without checking the function itself.
 \end{callout}
 
 
@@ -532,105 +558,46 @@ or checking properties of the function without checking the function itself.
 
 Let's say we are supposed to calculate the mortality rate
 for five-year age groups from birth to eighty years old,
-for a Gompertz-Makeham mortality law,
-\begin{equation}
-  \mu(x) = \alpha e^{\beta x} + \lambda.
-\end{equation}
-The function under test is a formula
-from a book, once pasted as a \textsc{png} into a Jira story.
-That function comes from the putting the Gompertz mortality
-rate into the integral for mortality,
-\begin{equation}
-  {}_nm_x = \frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(-\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(-\int_{x_n}^s\mu(a)ds)ds}.
-\end{equation}
-Someone plugged the Gompertz function for $\mu(x)$ into this
-formula in order to get the equation in the book.
+for a Gompertz-Makeham mortality law. The parameters are
+$(x, \alpha, \beta, \lambda),$ intermediate values are $(\mu, S)$ and the result is ${}_nm_x$.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  S(x) & = & \exp\left(-\lambda x - \frac{\alpha}{\beta}\left(e^{\beta x} - 1\right)\right) \\
+  {}_nm_x & = & \frac{\mu(x+n) S(x+n) - \mu(x)S(x)}{S(x) - S(x+n)}
+\end{eqnarray}
+Wherever this equation comes from, whether it be a book or a
+\textsc{png}\ in a Jira story, we can identify risks in transliterating
+these equations to code. The most likely faults are improperly grouping
+algebraic operations, mistaking signs, and forgetting terms. 
 
-We can check the code with a parallel implementation,
-where the new version does the integrals in the equation
-above. It will be very slow by comparison, but the answer should
-be the same within single precision if we are working in double precision.
+We can address those risks by returning to the first step of writing
+a scientific function, which is how we represent the mathematical model.
+The equations above are the result of integrating a function that has fewer
+steps, even though it would be slower to run.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  {}_nm_x & = &\frac{\int_{x}^{x+n}\mu(s) \exp(-\int_{x}^s\mu(a)ds)ds}{\int_{x}^{x+n}\exp(-\int_{x}^s\mu(a)ds)ds}.
+\end{eqnarray}
+The resulting ${}_nm_x$ should be the same as that above within
+machine precision, where machine precision means that we expect a drift
+of about one machine epsilon for each step of the integration. That means
+it should agree within several thousand times machine epsilon.
 
-This isn't a change to the model. It's a change to the 
-mathematical representation of the model, because the mortality
-rate is the same, but it's represented, in this test form,
-as a set of integrals instead of the analytic solution to
-those integrals. The algorithm in this new function will look
-considerably different. It could have its own faults, in its
+This new version could have its own faults and its
 own corner cases, but they are unlikely to be the same faults
 as the original function. This is a tremendous improvement over
-not having such a test, where there is little clue about what
-the mortality rate should be for any given set of parameters.
+not having such a test.
 
-It's a lot of work to re-implement a mortality rate
-computation by writing it to calculate integrals numerically.
-It's even more work to re-implement a mortality rate
-computation by casting it as an individual-based model, but this,
-too, can be a good idea when the risk of faults is high.
-
-To make an individual-based model for mortality, a function would
-create a million or more individuals and draw a random number for
-the death of each, according to the mortality rate. Then the mortality
-rate is found from the mean and first moment of deaths in each
-age group.
-This kind of calculation is easier than writing the problem as
-numerical integration, if and only if the code to sample from
-mortality probability distributions is on hand.
-
-Sampling individual deaths is a gold standard test for a mortality
-calculation, and the calculation is so different from the 
-function under test, that it's unlikely to have similar faults,
-but what it tests can be far afield from the function's code itself.
-For instance, models for individuals could problematize using
-the function under test for small populations.
+There are many possible parallel implementations. For this example,
+we could make the looser assertion that the relative error of ${}_nm_x$
+to $\mu(x)$ should be less than some cutoff. It's not as strong a test,
+but it's quick to write.
 
 What to test with brute force computation, and how to brute
 force that computation, depends on risk assessment, time, and
 whether your work is to question faults in the code or faults
 in the model.
 
-
-
-\subsection{Compare with limiting theory}\label{sec:limits}
-
-Not every parallel implementation is an brute-force retelling
-of a model. Most mathematical functions provide finger-holds
-support of their correctness.
-
-The simplest of these are parameters for which a function
-takes a known value. The function could be a mess of
-polynomials of trigonometric quantities,
-\begin{equation}
-  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
-\end{equation}
-but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
-and so on. If the function should divide by zero for some
-number, then that, too, is a parameter for which the function
-has a known value, an exception.
-
-Sometimes a limit of a function is the same limit you know
-from high school precalculus,
-\begin{equation}
-  \lim_{x\rightarrow\infty} f(x).
-\end{equation}
-Maybe the limit goes to zero, or to 3, but the principle is
-the same. You can test that a function is near the limit
-as the value gets larger, or closer to zero. Better, you can
-test that the function gets closer to the limit as the
-parameter gets closer to its limit.
-
-This is a game where incremental understanding of math
-gives incrementally more careful attention to risk in the
-function under test. We can know the limiting value of a
-function, but we can also know how the function approaches
-that limit. Another precalculus friend, the Taylor series
-writes a function as a sum of terms that get smaller,
-\begin{equation}
-  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
-\end{equation}
-If we know the first term in the series, then the second term
-is a good guess for how far the function's output should be from
-the limiting value, as a function of $x$.
 
 
 \subsection{Another language or library}
@@ -644,7 +611,7 @@ willing to take the painful step of limiting their first translation
 to perserve structure around the riskiest functions.
 
 Most languages provide some built-in interoperability to call
-other languages. R, C++, Julia, and Python play like hamsters
+other languages. R, C++, Julia, and Python play together like hamsters
 in a habitrail. It's perfectly reasonable to keep code from
 a different language in with the suite of unit tests and to
 call those functions when the interoperability is available.
@@ -654,7 +621,7 @@ operating systems, can probe a unique set of problems. Data types
 change, revealing limits to numerical accuracy and inappropriate
 assumptions about data structure. Libraries change, the ones that
 provide special functions or system services. For instance, the
-generalized inverse in Python will return a different inverse
+generalized inverse in Python will return a different value
 from the generalized inverse in R. When this breaks tests, it
 clarifies which, of the four kinds of generalized inverse,
 the code needed, and that there should be a test to see which
@@ -667,7 +634,7 @@ you could check your results against the values in the table or figure.
 Fig.~\ref{fig:wilson_chart} shows a chart from a paper. The unit test
 uses those figures.
 
-\begin{lstlisting}
+\begin{lstlisting}[language=R]
 wilson_score_interval <- function(p, n, confidence) {
   z <- qnorm((1 + confidence) / 2)
   fixed <- p + z**2 / (2 * n)
@@ -686,19 +653,19 @@ paper_numbers = data.frame(list(
     4, 4, 18, 4,
     3, 20, 49, 18,
     13, 59, 16),
-  p = c(
+  p = c(  # "Total n" column
     1, 1, 0.8333, 0.4667,
     0, 1, 0.4286, 0.5385, 1,
     .5, .75, 0.6667, 0.5,
     1, 0.6, 0.5306, 0.6111,
     0.3846, 0.3898, 0.5),
-  w_minus = c(
+  w_minus = c(  # "p(shall)" column
     0.2065, 0.2065, 0.4365, 0.2481,
     0, 0.6097, 0.1582, 0.2914, 0.4385,
     0.15, 0.3006, 0.4375, 0.15,
     0.4385, 0.3866, 0.3938, 0.3862,
     0.1771, 0.2758, 0.28),
-  w_plus = c(
+  w_plus = c(  # "D:w-" column
     1, 1, 0.9699, 0.6988,
     0.7935, 1, 0.7495, 0.7679, 1,
     0.85, 0.9544, 0.8372, 0.85,
@@ -742,12 +709,12 @@ they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
 is a data frame, did every value change, or some subset?
 
-While the book's advice is a research project, in its own right,
+While following the book's advice is a research project,
 it's a good focus for any particular project to find places in the
 code where regression tests would be most informative. Unit tests are
 most absolute in their pronouncement when they test the simplest
-functions. It's the mid-level functions, that do the more work
-and produce the most complex output, that benefit from regression.
+functions. It's the mid-level functions, that do more work
+and produce the more complex output, that benefit from regression.
 The high-level functions will change output every time you touch
 the code, but mid-level functions will change less frequently,
 and there's a chance to guess why they changed.
@@ -755,21 +722,29 @@ and there's a chance to guess why they changed.
 
 
 \section{Testing parameter logic}\label{sec:parameter-logic}
-\subsection{Introduction}
-While an algorithm in your \emph{Matrix Computations}~\citep{golub2013} book may seem
-unequivocal, every important function in scientific code accretes
-options, parameters, and choices.
-The start of a function like this has
-a sequence of if--thens. Worse, the middle of a function like this
-has embedded if--thens. These are logic tests, and getting them
-right can be painful.
+\subsection{Introduction}\label{sec:parameter-introduction}
+If we need to implement some matrix algorithm, then
+we might make a function that has a few arguments: the matrix of data, algorithm parameters
+to control cutoffs in the algorithm, and options to determine whether
+the result is written back into the source matrix memory.
+The data, algorithm parameters, and options are all, in the eyes of unit testing,
+parameters.
 
-There are some cases where unit tests can exhaust all possible
-input combinations. For instance, bit-shifting functions on
-32-bit values can be tested for every possible 32-bit value
-in less than a few minutes. The same is not true for 64-bit values.
+These three kinds of parameters, however, tend to affect functions
+differently. Options appear in the test of if--thens, so they change
+the code path. The code path is the sequence of blocks of code that execute
+for a particular set of parameters.
+Algorithm parameters tend to appear in key equations, so that they
+affect data flow in a function. The data flow is a graph
+of which values in a function depend on which previous values.
+The input matrix, itself, is effectively a two-dimensional matrix of
+parameters, greatly increasing the number of possible inputs to a function.
 
-In other cases, we have to choose which parameters and parameter
+
+\subsection{Decision Tables}\label{sec:parameter-decision}
+
+Given that scientific functions have large spaces of possible inputs,
+we have to choose which parameters and parameter
 combinations to test, and we limit the tests by identifying
 parameter values that are nearly-the-same test. For instance,
 if a function calculates age-standardized mortality rate, then testing
@@ -785,143 +760,249 @@ each of the equivalence classes of inputs. Deciding what is an
 equivalence class can be difficult. Sometimes two parameters
 sets are equivalent in terms of the mathematical statement of 
 the model, but their representation in code makes one set
-have a different risk from another, for instance, due to
-denormalization. It can also be the other way around, that
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
 the mathematical statement of a model makes clear what parameter
 sets may be equivalent. Information from both statements of
 a function will be helpful.
 
+A decision table is a list of parameters and the expected result
+of the function, arranged with one unit test per row. The
+tests can exhaust all possible parameter combinations or
+can have a row per equivalence class, when the number of combinations
+becomes large.
 
-\subsection{Decision Tables}
-\aside{Categorical---give real example.}
-A decision table enumerates sets of inputs and desired outputs for each set.
-For example, if a variable can be 0, 1, or 2, then there are three possible
-inputs. The chart would be three lines long. If the function were $2^n$,
-the chart might be
-
+For instance, consider a function that projects a time series
+using the trend of its running average. It could use the slope
+of the last $m$ entries in the time series. It could weight
+those last $m$ entries according to an exponential or Gaussian, so that
+earlier entries count less. It could transform the entries
+into log-space before projecting them. These options create
+sets of allowed parameters.
 \begin{center}
-\begin{tabular}{|l|l|}\hline
-power & output \\ \hline
-0 & 1 \\
-1 & 2 \\
-2 & 4 \\ \hline
+\begin{tabular}{|l|l|l|l|l|}\hline
+$m$ & kernel & transform & range & output \\ \hline
+5 & Gaussian & linear & 1.0 & 2.7 \\
+5 & Gaussian & logarithmic & 2.0 & 1.9 \\
+5 & exponential & linear & 3.0 & 2.8 \\
+5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
 \end{tabular}
 \end{center}
-
-If we add a parameter that says whether the variable is positiver or negative,
-then the decision tree has $3\times 2$ rows,
-
+The clear table is pleasing, but we can see that, even for
+this small case, the list will be long. The example
+above doesn't even begin to probe error conditions, such
+as negative $m$ values or $m$ greater than the length
+of the data. We might define equivalence classes for each
+parameter, such as these.
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
-power & positive &output \\ \hline
-0 & T & 1 \\
-1 & T & 2 \\
-2 & T & 4 \\
-0 & F & 1 \\
-1 & F & 1/2 \\
-2 & F & 1/4 \\ \hline
+parameter & \# cases & cases \\
+$m$ & 5 & negative, 0, less than data, equal to data, more than data \\
+kernel & 2 & Gaussian, exponential \\
+range & 3 & negative, 0, positive \\
+transform & 2 & linear, logarithmic \\ \hline
 \end{tabular}
 \end{center}
+That makes $5 \times 2 \times 3\times 2 = 60$ cases.
+The table also fails to mention the most important
+parameter, the vector of data values.
 
-This is great, but the list gets big because the options multiply.
-In the example here, we knew the exact answers.
-When there are more cases, you may only be able to \aside{specify properties} of the
-answer as a function of the parameters. It's a weaker check,
-but it could help.
+If a parameter is a vector of numbers, what to test depends
+even more on the particular math. Some suggestions:
+\begin{enumerate}
+    \item Set all values to a single edge case.
+    \item Try monotonically-increasing or decreasing.
+    \item Try non-increasing or non-decreasing (so that some
+    consecutive values are the same).
+    \item End points may be special, so test them separately.
+    \item If the vector is, in some way, smooth, construct
+    a vector where the maximum change, element to element, is no
+    more than some prescribed value. See how large that value can
+    be before the function fails.
+    \item Orthogonal arrays are random draws of values that
+    are spread out evenly through a multidimensional space.
+    They are one way to explore the space of input arrays~\citep{Owen1992}.
+\end{enumerate}
+Each of these suggestions becomes another category for
+equivalent inputs. If we used these five, then the total
+number of tests above would be $60\times 6 = 360$.
+
+
+\subsection{Limiting values of parameters}\label{sec:limits}
+
+Not every parallel implementation is an brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
+Another kind of limit is the distance between function results
+as the function inputs get closer to each other. We can often
+find faults in a function by testing continuity of the output.
+Here, a good unit test would mirror the definition of Lipshitz continuity.
+\begin{lstlisting}[language=python]
+C = 2.0
+for (x1, x2) in [(0, 1), (0, .1), (0, .001)]:
+    assert f(x2) - f(x1) < C * (x2 - x1)
+\end{lstlisting}
+The \lstinline!C! variable is a bounds on the slope for any
+pair of numbers.
+
+Sometimes a limit of a function is the same limit you know
+from high school precalculus,
+\begin{equation}
+  \lim_{x\rightarrow\infty} f(x).
+\end{equation}
+Maybe the limit goes to zero, or to 3, but the principle is
+the same. You can test that a function is near the limit
+as the value gets larger, or closer to zero. Better, you can
+test that the function gets closer to the limit as the
+parameter gets closer to its limit.
+
+This is a game where incremental understanding of math
+gives incrementally more careful attention to risk in the
+function under test. We can know the limiting value of a
+function, but we can also know how the function approaches
+that limit. Another precalculus friend, the Taylor series
+writes a function as a sum of terms that get smaller,
+\begin{equation}
+  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
+\end{equation}
+If we know the first term in the series, then the second term
+is a good guess for how far the function's output should be from
+the limiting value, as a function of $x$.
+
 
 \subsection{Test Case Generation}
 \aside{By-hand versus complete cases}
-Could we tell the testing framework about our input parameters
-and let it do \emph{automatic test case generation?}
-If we test a function by supplying every combination of inputs,
-it's called \emph{combinatorial interaction testing.}
-The number of tests generated can be large, even for few parameters.
-That can make it difficult to supply all of the expected results.
-If we could exclude parameter combinations that definitely fail
-or are uninteresting, there would be many fewer tests.
+When we decide to use test-driven design, we start each bout of
+coding by writing a test that mimics user input, and then we write
+code until the application responds correctly to the user.
+This is a high-level test, and it's an example of a test that
+has many parameters because, for a scientific application, it
+usually corresponds to adding a user-specified option to the
+sum of the input data and configuration files. There is no
+way to try every combination of inputs, and the application
+may take a long time to run.
 
-The fraction tested, of all possible inputs, is \emph{test coverage.}
-If test exercise every possible input for each parameter, separately,
-that's depth-1 coverage. If all pairs of inputs are tested, that's
-depth-2 coverage. It's usually good to prioritize lower-depth coverage
-before higher-depth coverage. What are the main practical
-approaches to generating tests with good coverage up to some depth?
+The luxury of combining every combination of input parameters
+is called \emph{combinatorial interaction testing.} We usually
+test some fraction of these possible inputs, called the
+\emph{test coverage fraction,} not to be confused with the
+term \emph{test coverage,} that refers to the percentage of
+all code paths that are run at least once by any unit test.
 
-\subsubsection{Random Parameter Choices}
-Given a set of possible values for each parameter, use a random
+How we choose which, of all possible tests, to run is a question
+of test design, the same way a doctor designs a randomized
+controlled trial or a botanist chooses treatments of plants
+in a field. Let's look at how the most common choices
+address risks in the code most efficiently.
+
+
+\subsubsection{Random parameter choices}
+Given a set of possible equivalence classes for each parameter, use a random
 number generator to choose one of each. Do this as many times
-as runtime allows. (Can I find expected coverage as a function of
-random draws?) The Python tool, \texttt{Hypothesis,} uses this
-method. \aside{example}
+as runtime allows. When using this method, it's critical to
+report not only failing tests but also the exact set of parameters
+that made the tests fail.
 
-\subsubsection{Combinatorial Excursions}
+Randomized test cases are easy to implement, and they can
+supplant the author's duty to identify the greatest risks
+in the code. The main drawback is time to run this kind of
+test, especially because it's tempting to play the lottery
+by letting it keep running.
+
+
+\subsubsection{Combinatorial excursions}
 If you decide that there is some most-common way to call
 the function, set that as the baseline. Then loop over parameters,
-trying values for each one. Then loop over pairs of parameters.
-Then sets of three. These tests would be highly-biased
-towards that baseline parameter set. \aside{example}
+trying all equivalence classes for each one. Then loop over pairs of parameters. Then sets of three. You define a limiting depth,
+where the full combinatorial excursion is the case where the
+limiting depth is the number of parameters.
 
-\subsubsection{All Pairs}
-There may be software available to generate tests which
-include all pairs of input parameters.
-I suggest using a library because generating tests that have
-all pairs can be tricky to do well.
-The Pairwise website lists libraries in
-various languages~\cite{Pairwise}. For instance, AllPairsPy
-does this for Python~\cite{allpairspy}.
-An example all-pairs algorithm is in~\citet{tung2000automating}.
-How to write such an algorithm is covered in professional
-textbooks on software testing, such as~\citet{pezze2008}.
-Two Microsoft articles might be a friendly start to writing
-one yourself~\citep{blass2002,czerwoka2006}.
-
-\aside{example, and describe limitations}
+These tests would be highly-biased towards that baseline parameter set.
+It can make sense to define several most-important baseline
+parameter sets from which to conduct combinatorial excursions.
 
 
-\subsubsection{Stratification and Filtering}
-It helps a lot to select subsets of the parameter
-space that must be run or that can be ignored. This work
-is largely done by hand. Maybe you set the value of one parameter
-and then use an automated tool to generate the rest of
-the parameters given that one value. This stratification
-can halve the number of tests without increased risks.
-Python's Hypothesis helps build stratified tests.
+\subsubsection{All pairs}
+What if we could guarantee, that if we pick any two parameters
+of a function, and we pick two values for those parameters,
+that there is at least one unit test that includes that combination
+of parameters? This is the all-pairs test design, to test
+every possible pairwise interaction among parameters.
+It packs these into as few tests as possible. For instance,
+the same unit test might be the only time that pair
+$(a=1, b=2)$ and pair $(c=3, d=4)$ appear, because their
+pairwise interaction appeared in the same test.
 
-There are also two kinds of filtering you can do on 
-generated test cases. You can exclude tests for combinations
-of parameters that violate preconditions of the function.
-You can also filter out tests that you feel are less risky.
-These latter, soft conditions, make sense when you can
-look inside the code in order to assess risk.
+All-pairs testing offers a feeling of completeness while
+using many fewer tests than even a depth-2 combinatorial
+excursion. There are claims that all-pairs testing almost
+always finds every fault in a function that full combinatorial
+excursions would fine~\citep{Pairwise}. It does not, however,
+do any better a job than the randomized testing of emphasizing
+particular parameter sets that the author decides carry
+the most risk for a function or application.
 
-Together, stratification and filtering reduce the total number
-of tests to run so that they focus on the highest risks
-in the shortest time.
+The trick to using all-pairs testing is finding a library
+that will compute the sets of parameters to use. Finding
+those sets is, itself, an optimization problem.
+While AllPairsPy works for Python~\citep{allpairspy},
+and several papers cover algorithms~\citep{tung2000automating,pezze2008},
+there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
+
+
+\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
+The sections above all imply that there could be some way
+to emphasize which test are chosen, based on an assessment
+of which parameters carry the most risk. For instance, if
+a parameter is an option to make a copy of the input data
+before further work, it would be enough to test that exactly
+once, and not in all other parameter combinations. On
+the other hand, there may
+be certain parameter values that should be thoroughly-tested
+because they challenge the numerical precision of the algorithm.
+
+The ability to prefer tests of certain sets of parameter values
+is called \emph{stratification.} That means you take any
+of the test generation methods above and give the test author
+the ability to weight which tests it should generate.
+
+The throw out some of the generated tests is called
+\emph{filtering.} Sometimes it's easier to generate tests
+and toss useless ones than it is to generate the most-desired
+tests in the first place.
+
+Some of the more professional testing software includes
+these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
+\textsc{cts}~\citep{hartman2004problems},
+and the \textsc{act} library~\citep{kuhn2008automated}.
+
 
 \subsubsection{All Other Methods}
-If each run of a test takes a long time, it might be worthwhile
-to choose tests yet more wisely than any method listed above.
-To understand the problem, I recommend reading~\citet{petke2015practical}.
+The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
+are yet another way to generate tests that span the space of
+all possible parameters~\citep{Owen1992}.
+Whichever method you choose, it's
+good to have one of these methods available when it's time to
+do user-level testing on scientific code.
+\citet{petke2015practical} cover these strategies in their book,
+and there are a few survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
 
 
-\emph{Orthogonal arrays} are a way to construct random draws
-of parameters that can be shown to be more spread out through
-the space of all possible draws. Generating orthogonal arrays
-appears to be difficult, so people start by looking up the
-needed array in a repository and then use that to generate
-test cases~\citep{Owen1992}.
-
-There are a couple of libraries or web services that offer
-to generate test cases. \textsc{aetg} uses a greedy algorithm~\citep{cohen1997aetg}.
-The automated combinatorial test methods (\textsc{act}) library
-is also greedy~\citep{kuhn2008automated}.
-The combinatorial testing services library (\textsc{cts})
-uses simulated annealing to find good test cases~\citep{hartman2004problems}.
-
-There are survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
-
-
-\subsection{Example}
+\subsection{Example}\label{sec:parameter-wilson}
 This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
 
 This function finds standard error from effective sample size for two
@@ -1029,13 +1110,59 @@ Think of parameter-handling as translation from an external
      consistent, concise for internal processing.
 
 
-\section{Testing data movement}
+\section{Mutation testing}\label{sec:random-changes}
+The function under test, as with any block of code, can be
+represented as a syntax tree. This tree of operators, operands,
+and assignments, represents a contract with the compiler,
+represents the flow of information from parameters to output,
+represents a treasure map of potential faults. There is a form
+of testing that reads the function under test, creates its
+syntax tree, and randomly mutates it. At random, it adds a one to the
+limit of a loop, and runs the unit tests again. It changes
+the order of assigment statements and tests again. Each time
+it records the change to the tree, and the outcome of the tests.
 
-\subsection{Data movement}
+When the test suite is mature, then there should be some test
+that fails for each mutation, but that isn't the case. A
+large percent of genetic mutations of the code that
+cause no test to fail, and most of those won't indicate the
+code has a fault, or even that tests are incomplete. Instead,
+these cases force a question about what choices in the code
+matter and what is irrelevant.
 
-We said earlier that there are three steps to making scientific
-software, choosing the mathematical model, discretizing that
-model, and deciding algorithms to implement the discretized model.
+We discussed in Sec.~\ref{sec:parameter-introduction} that
+we can understand a function by parsing it as a code path
+or as a data flow. Each random mutation to the code will
+have an effect that traces backwards to the input parameters
+or forwards to the result, through code paths and data flows.
+When a mutation has no effect on tests and isn't a fault,
+it highlights the conditionals that it affects later in the function
+and the values it affects later in the function.
+
+What we discover, when we look at those conditionals and
+values, is that mutations won't be faults when they don't
+break invariants in the code that are enforced by more than
+one mechanism. For instance, they may set a value that is
+later overwritten, not read. They may change the length
+of an array, but later for-loops iterate only over a smaller
+portion of the array.
+
+It's normal for a function to accidentally doubly-enforce
+the invariants it needs to be true. It's normal for this testing
+technique to tell you, once for each of thousands of iterations,
+that either your test coverage is incomplete or that
+code will sometimes work fine after your cat walks across
+the keyboard.
+
+
+\section{Testing data movement}\label{sec:data-movement}
+
+\subsection{Data movement}\label{sec:movement-movement}
+
+We said in Sec.~\ref{sec:parallel-twice} that there are four
+steps to writing a scientific function, representing the mathematical model,
+preparing a discrete version, translating it to algorithms,
+and writing the code.
 Rarely is scientific software just one mathematical model
 and just one ensuing algorithm. It's a series of models supported
 by a series of algorithms.
@@ -1048,16 +1175,18 @@ As a result, performant scientific code is a series of algorithms
 joined by a series of translations from one data structure to
 another, each to support the next algorithm. The high-performance
 computing crowd calls any such code \emph{data movement,} as though
-it were excreted, but software engineers call it integration code
-and call the testing of it integration testing.
+it were replacing sets in the entracte,
+but software engineers call it integration code and know that
+integration testing is one of the most important kinds of unit test.
+
 
 \subsection{Integration testing data movement}
 
 A classic example of data movement is reorganizing a multidimensional
 array from one axis ordering to another. An algorithm with nested
 for-loops usually acts on nested axes. The order of the axes should
-put those for the inner loops last (for C and Python which are row-first), or put those
-same axes first (for R and Julia which are column-first). This so
+put those for the inner loops last (for \textsc{c} and Python which are row-first), or put those
+same axes first (for \rlang and Julia which are column-first). This so
 often controls the speed of an algorithm that it isn't considered an 
 optimization to fix it but an error to fail to set the order.
 
@@ -1066,28 +1195,35 @@ an edge-list representation to an adjacency matrix representation.
 Both have their place, but the correct form depends on the
 algorithm that will act on this data.
 
-The question isn't how to test data movement. It's that data
-movement is separate from the algorithm. It should be a separate
-function and tested on its own. It has its own set of faults,
-that center around integer arithmetic, the off-by one errors,
-the loop endpoint errors. These are different in nature from
-the taxonomy of faults that plague an algorithm-in-itself,
-but they are no less debilitating to correctness.
+Data movement tends to stress performance of memory access
+and integer arithmetic. It carries risks of off-by-one errors,
+loop endpoint errors, and assignment errors. These are different
+from the performance characteristics and likely faults in core
+algorithmic code, so they suggest data movement should be in its
+own function and should be tested separately, for both performance
+and efficient testing.
+
+This produces a mental model for a scientific application. It begins
+with translating configuration parameters from their specification
+to the values internally. Inputs are verified. Then the application
+is a series of data movement, followed by algorithm, and data movement
+for the next algorithm. Then results are written.
 
 \subsection{The CRUD case}\label{sec:crud}
 
 The prosaic brother to data movement is the ubiquitous selection
-and editing of data frames we do when reading and writing data.
-The data frame, in which this data typically lives, is the
-algorithmic equivalent of a minivan, fully equipped but less
-computationally intriguing.
+and editing of data frames when reading and writing data.
+The data frame is the algorithmic equivalent of a minivan, more
+about convenient pickup and drop-off than about getting from $A$
+to $B$. When we edit data frames, during save or load, or during
+data movement, the correct result is more a matter of software specification
+than a matter of difficult calculation.
 
-Dataframe manipulation for loading and saving data is more a matter
-of how we want to specify a program than about moving from
-one data structure to another. There is, happily, a framework
+A good testing method for data frame manipulation, is therefore
+unit tests that assert the output data frame meets a list of requirements.
+There is, happily, a framework
 for recording and conveying this work, the create-read-update-delete
-(CRUD) list.
-
+(CRUD) list. For example, if we were editing a mortality data frame:
 \begin{itemize}
 \item \textbf{Create} - If the input data doesn't have excess mortality,
   then derive it from cause-specific mortality and prevalence.
@@ -1097,27 +1233,19 @@ for recording and conveying this work, the create-read-update-delete
   locations because it tends to be sparse.
 \item \textbf{Delete} - All-cause mortality isn't included in this step.
 \end{itemize}
-
 These are requirements. Failure to meet one of these requirements
-often won't make the code stop running. It will harm confidence
-in the code.
+often won't make the code stop running. It's no less wrong.
 
-These tests are therefore classic boundary-value tests, where
+These tests are classic boundary-value tests, where
 we try parameters at the lower boundary, upper boundary,
 and middle of the range. Combinatorial testing can be appropriate
-across all parameters. What isn't mentioned in Jorgensen, for instance,
-is that input datasets are parameters. They are high-dimensional
-parameters which can make combinatorial testing quite large.
-You are asking not only whether the dataset is nonzero in length,
-as a boundary value, but whether each kind of data record is at
-any boundary value that it can take on. For all cases, the goal
-is to assert that requirements, as stated above in CRUD categories,
-are true for all parameter values.
+across all parameters, and we can often create a single data frame
+where each row represents a different test.
 
 \subsection{Example}
 This example, in Python, is a function with two arguments, but both
 are dataframes, just read from input files. Think of them as two spreadsheets
-with multiple rows and column headers ``x\_local'', ``a\_data\_id''
+with multiple rows and column headers \lstinline!x_local!, \lstinline!a_data_id!,
 and so on.
 \begin{lstlisting}[language=Python]
 def shift_priors(self, data, adj_data):
@@ -1170,14 +1298,15 @@ the possible values of each entry in each row of the input data?
 \end{tabular}
 \end{center}
 
-That makes $3\times 4 \times 3\times 2\times 2\times 4=576$ different inputs.
+\noindent{}That makes $3\times 4 \times 3\times 2\times 2\times 4=576$ different inputs.
 This excludes the effects of calling the function
 \lstinline!adjust_prior_by_mean_of_fit()!.
 
 What is the algorithmic complexity of this function? There is one
 if--then--else, so the answer could be three, but each condition in a dataframe
 selection is another path through the code. For instance,
-\lstinline!data.x_local == 0! is a conditional with two outcomes.
+\lstinline!data.x_local == 0! is a conditional with two outcomes, leading
+to very high algorithmic complexity, hidden in data frame arguments.
 
 A project manager can ensure good communication between the scientist and
 developer by writing \textsc{crud} assertions in English.
@@ -1193,31 +1322,24 @@ developer by writing \textsc{crud} assertions in English.
         priors for the same integrand.
 \end{itemize}
 Then we can write tests that verify these \textsc{crud} requirements for
-each of the 576 kinds of inputs. \aside{show the test}
+each of the 576 kinds of inputs.
 
 
-\subsection{Trust the movement}
 
-In order to test data movement separate from the main algorithm,
-we have to separate data movement from the main algorithm.
-This is one of those times that what is testable indicates what
-is modular in code.
-
-
-\section{Using symmetry to test a function}
+\section{Using symmetry to test a function}\label{sec:symmetry-test}
 
 Sometimes knowing the math of a software function lets you
 test the software, even when you have an oracle problem.
 \emph{Metamorphic testing} uses the symmetry of the math function
-in order to test the correctness of the software function~\cite{ding2016,guderlei2007,kanewala2015,liu2014}.
+in order to test the correctness of the software function~\citep{ding2016,guderlei2007,kanewala2015,liu2014}.
 
 The mathematical description of a function is that it relates
 a domain (input) to a range (output). We write $f(x) = y$.
 If the function is an exponential, then $e^{-x} = 1 / e^x$,
 so $f(-x) = 1 / f(x)$. We may not know what the value of
-$e^2.4$ is, but we do know it's $1 / e^{-2.4}$.
+$e^{2.4}$ is, but we do know it has to match $1 / e^{-2.4}$.
 
-Here's another example. Given a mortality rate, $m$, the
+Here's a longer example. Given a mortality rate, $m$, the
 mean age of death over an age interval, $n$, is
 \begin{equation}
     a = \frac{n - n(1+m n)e^{-m n}}{1 - e^{-m n}}.
@@ -1229,7 +1351,6 @@ If we notice that this equation can be written
 then we can design an interesting test.
 \begin{eqnarray}
     \frac{a}{n} &= &f_1(m  n) \\
-    \frac{a}{n} &= & f_1((2  m)  (n / 2)) \\
     \frac{a/2}{n/2} &= & f_1((2  m)  (n / 2)) \\
     a /2 &= & (n/2) f_1((2  m)  (n / 2)) \\
     a &= &2 * f(2m, n/2) \\
@@ -1241,10 +1362,11 @@ form of symmetry testing, which insists that some transformation
 of the inputs has a relationship with some transformation of the 
 outputs,
 \begin{equation}
-    f(g(x)) = h(y).
+    f(g(x)) = h(f(x)),
 \end{equation}
+where $f$ is the function under test, and $g$ and $h$ are the transformations.
 
-\begin{lstlisting}
+\begin{lstlisting}[language=R]
 mean_age_of_death <- function(m, n) {
   (n - n * (1 + m * n) * exp(-m * n)) / (1 - exp(-m * n))
 }
@@ -1259,12 +1381,12 @@ test_that("dividing by a constant multiplies by a constant", {
 })
 \end{lstlisting}
 
-There is a paper that shows symmetry testing catches a lot of bugs.
-
-What do I test when I test such a small equation?
-a) typing. It's not small enough not to make a mistake, if you're like me.
-b) math of floating point. Small m or n leads to numerical problems.
-You decide whether you care about small m.
+Metamorphic testing is an assertion about a symmetry relationship between
+the domain and range of a function. Because it's an invariant at the top-level
+of the function, it has an opportunity to find simple faults in algebra,
+grouping of terms, or off-by-one errors. It also has an opportunity to
+find faults that result from denormalization or loss of significant digits
+in floating-point math.
 
 
 \begin{callout}
@@ -1279,13 +1401,13 @@ a function?
 \end{callout}
 
 
-\section{Testing the compiler}
+\section{Testing the compiler}\label{sec:test-compiler}
 
 Let's say you have a cluster of computers. They are all Intel machines,
 but they come from different years. They could be different architectures
-or just different steppings of the CPU, which is the least difference
+or just different steppings of the \cpu, which is the least difference
 one can have between two chipsets. You compile code on one machine,
-or you install some R package that compiles code underneath. When
+or you install some \rlang package that compiles code underneath. When
 you move to another computer on another day, that same code fails
 to run with the message, ``invalid opcode.''
 
@@ -1294,7 +1416,7 @@ yesterday knew a command that's slightly too fancy for the computer
 you're using today, and it failed. You have to clean out the code
 and recompile today. It's not that the new computer is just older.
 It's still possible that, were you to switch back, there might be
-the same message again. The history of CPU opcodes isn't a forward
+the same message again. The history of \cpu opcodes isn't a forward
 march into a larger, better set.
 
 That scenario would be annoying, and it's a headache for people
@@ -1309,7 +1431,7 @@ software runs on the other computer but gives the wrong error.
 It can fail silently. This seems like an abrogation of a compiler's
 contract with its faithful coder, but it isn't. That compiler
 ensured that the code ran well enough on one target architecture.
-The problem is that compiler optimizations at level O3, and above,
+The problem is that compiler optimizations at level \textsc{o3}, and above,
 are willing to make slightly riskier choices that yield great
 performance benefits. These choices are tuned to the architecture
 at hand, or as requested by compiler options, and, while they may
@@ -1319,8 +1441,9 @@ that don't clearly represent time-saving invariants and of coders
 who can't afford motorcycles.
 
 There's a solution for this, too. Turn all optimizations down
-to O2 or lower. Or claim that the CPU uses the SSE2 instruction set.
-Unless you're intentionally commemorating the death of Phil Katz, you'll see
+to \textsc{o2} or lower. Or claim to the compiler that the \cpu
+understands no later than the \textsc{sse2} instruction set from 2000.
+Unless you're intentionally commemorating the year Phil Katz died, you'll see
 this as a severe loss of performance.
 
 The last option to deal with this problem is called acceptance
@@ -1341,49 +1464,11 @@ so that those that are most sensitive to correctness run by
 themselves, or run first~\cite{yoo2012regression}.
 
 
-\section{Random changes to the code}
-The function under test, as with any block of code, can be
-represented as a syntax tree. This tree of operators, operands,
-and assignments, represents a contract with the compiler,
-represents the flow of information from parameters to output,
-represents a treasure map of potential faults. There is a form
-of testing that reads the function under test, creates its
-syntax tree, and randomly mutates it. It adds a one to the
-limit of a loop, and runs the unit tests again. It changes
-the order of assigment statements and tests again. Each time
-it records the change to the tree, and the outcome of the tests.
-
-When the test suite is mature, then there should be some test
-that fails for each mutation, but that isn't the case. There
-will be twenty percent of genetic mutations of the code that
-cause no test to fail, and most of those won't indicate the
-code has a fault, or even that tests are incomplete. Instead,
-these cases force a question about what choices in the code
-matter and what is irrelevant.
-
-One way to measure what matters in code is to pick a
-parameter and mark every line where its value affects
-an assignment. Then track each of those down the line.
-You'll see that only under certain conditions do certain
-parameters change a result.
-
-A similar way to understand a function is to choose central
-moments, the lines where the important math happens, and
-trace back to what affected those lines and forward to
-how those lines become the result.
-
-These are lenses into the code that clarify relationships
-among corner cases, dependence and independence from
-line-by-line choices. The lens is more important than the
-mutation technique, which should be left to those with
-undue free time or responsibility for manned rockets.
-
-
-\section{Outside the code}
+\section{Outside the code}\label{sec:outside-code}
 
 \subsection{Documentation defines what a function wants to be}
 
-The section above, on parameter testing, uses a function that's a hybrid
+Sec.~\ref{sec:parameter-wilson}, on parameter testing, uses a function that's a hybrid
 between Wilson's score interval and a Poisson estimator. That hybrid
 doesn't have a name, and there's no paper or Wikipedia entry for it.
 We can test that its output is a continuous function of its input
@@ -1396,8 +1481,8 @@ outside the room. It includes reviewers. It includes future versions of the team
 
 The tests can be a clear statement of the contract this function upholds.
 So, too, can project documents, as mentioned in the data movement section,
-where CRUD defines selection from a dataframe. Documentation isn't just
-another link in the chain of understanding. It is where the software
+where \textsc{crud} defines selection from a dataframe. 
+Function documentation, in particular, is where the software
 developer, the one who wrote the function, states their understanding
 of the contract that function fulfills. It's the closest statement,
 in English, of what unit tests should assert.
@@ -1433,11 +1518,10 @@ describe its expected behavior. Someone could raise an observation
 that brute force solution is suprisingly possible.
 The team could discuss likely sets of parameters that might
 matter, some determined by the math, some by logic in the
-code. A product manager could supply CRUD requirements.
+code. A product manager could supply \textsc{crud} requirements.
 A systems engineer could describe the expected architectures
-and risk of failure due to optimization levels. Whether these
-are separate people or roles for a very few people, their
-communication gives testing the best chance at relevance.
+and risk of failure due to optimization levels. Every section
+of this document is a prompt for conversation.
 
 Testing well is helpful, but we saw, in the section about
 data movement, that identifying what is data movement
@@ -1451,28 +1535,40 @@ understanding where new things are added and less useful
 ideas are dropped.
 
 In this research environment, collaboration on testing
-creates commonly-understood, trusted functions. These, more
+creates commonly-understood, trusted functions. This shared
+agreement on the (tested) entities with which we do our work, more
 than any single snapshot of the whole calculation, are
 what the group understands about the code. These trusted
 functions will be copied into other projects, translated
 to other languages. They will exist long beyond the work
 that has your name.
 
-\section{Further Reading}
+\section{Further Reading}\label{sec:further-reading}
+
+The most complete books on general software testing offer a sound
+basis for testing any kind of code. I recommend starting with
+\emph{Software Testing: A Craftsman's Approach,}~\citep{jorgensen2013},
+while skipping its chapter on set theory, and then taking a look at
+\emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\citep{pezze2008},
+if you haven't had enough.
+
+The complexity of scientific code not only makes it difficult
+to test but also mummifies past working code. Lest such a mummy
+come to life in your hands, look at \emph{Working Effectively with Legacy Code,}~\citep{feathers2004working}.
+
+There are several sources directed at scientific developers, for
+construction of code, as well as testing. These are some recent highlights:
 \begin{itemize}
-	\item \emph{Software Testing: A Craftsman's Approach,}~\cite{jorgensen2013}.
-	\item \emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\cite{pezze2008}.
-	\item \emph{Working Effectively with Legacy Code,}~\cite{feathers2004working}.
 	\item \emph{Software Engineering for Science,}~\cite{carver2017}.
 	\item ``Testing Scientific Software: A Systematic Literature Review,''~\cite{kanewala2014}.
 	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
-	\end{itemize}
+\end{itemize}
 
 \appendix
 
 \section{Faults in Mathematical Code}\label{sec:faults-and-failures}
 
-For each section, ask \aside{what faults does this technique limit?}
+For each section, ask what faults does this technique limit?
 For instance, using a limit test for constant-mortality mean age
 ensures you don't have a numerical fault.
 
