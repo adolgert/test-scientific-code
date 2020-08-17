@@ -503,7 +503,7 @@ a function isn't too wrong.
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
-\subsection{Write it Twice}
+\subsection{Write it Twice}\label{sec:parallel-twice}
 Read through unit tests, and they all have the same form.
 They set up data and parameters to pass to a function, call the
 function, and either compare its output to some known answer or to
@@ -1098,51 +1098,59 @@ Think of parameter-handling as translation from an external
      consistent, concise for internal processing.
 
 
-\section{Random changes to the code}\label{sec:random-changes}
+\section{Mutation testing}\label{sec:random-changes}
 The function under test, as with any block of code, can be
 represented as a syntax tree. This tree of operators, operands,
 and assignments, represents a contract with the compiler,
 represents the flow of information from parameters to output,
 represents a treasure map of potential faults. There is a form
 of testing that reads the function under test, creates its
-syntax tree, and randomly mutates it. It adds a one to the
+syntax tree, and randomly mutates it. At random, it adds a one to the
 limit of a loop, and runs the unit tests again. It changes
 the order of assigment statements and tests again. Each time
 it records the change to the tree, and the outcome of the tests.
 
 When the test suite is mature, then there should be some test
-that fails for each mutation, but that isn't the case. There
-will be twenty percent of genetic mutations of the code that
+that fails for each mutation, but that isn't the case. A
+large percent of genetic mutations of the code that
 cause no test to fail, and most of those won't indicate the
 code has a fault, or even that tests are incomplete. Instead,
 these cases force a question about what choices in the code
 matter and what is irrelevant.
 
-One way to measure what matters in code is to pick a
-parameter and mark every line where its value affects
-an assignment. Then track each of those down the line.
-You'll see that only under certain conditions do certain
-parameters change a result.
+We discussed in Sec.~\ref{sec:parameter-introduction} that
+we can understand a function by parsing it as a code path
+or as a data flow. Each random mutation to the code will
+have an effect that traces backwards to the input parameters
+or forwards to the result, through code paths and data flows.
+When a mutation has no effect on tests and isn't a fault,
+it highlights the conditionals that it affects later in the function
+and the values it affects later in the function.
 
-A similar way to understand a function is to choose central
-moments, the lines where the important math happens, and
-trace back to what affected those lines and forward to
-how those lines become the result.
+What we discover, when we look at those conditionals and
+values, is that mutations won't be faults when they don't
+break invariants in the code that are enforced by more than
+one mechanism. For instance, they may set a value that is
+later overwritten, not read. They may change the length
+of an array, but later for-loops iterate only over a smaller
+portion of the array.
 
-These are lenses into the code that clarify relationships
-among corner cases, dependence and independence from
-line-by-line choices. The lens is more important than the
-mutation technique, which should be left to those with
-undue free time or responsibility for manned rockets.
+It's normal for a function to accidentally doubly-enforce
+the invariants it needs to be true. It's normal for this testing
+technique to tell you, once for each of thousands of iterations,
+that either your test coverage is incomplete or that
+code will sometimes work fine after your cat walks across
+the keyboard.
 
 
 \section{Testing data movement}\label{sec:data-movement}
 
-\subsection{Data movement}
+\subsection{Data movement}\label{sec:movement-movement}
 
-We said earlier that there are three steps to making scientific
-software, choosing the mathematical model, discretizing that
-model, and deciding algorithms to implement the discretized model.
+We said in Sec.~\ref{sec:parallel-twice} that there are four
+steps to writing a scientific function, representing the mathematical model,
+preparing a discrete version, translating it to algorithms,
+and writing the code.
 Rarely is scientific software just one mathematical model
 and just one ensuing algorithm. It's a series of models supported
 by a series of algorithms.
@@ -1155,16 +1163,18 @@ As a result, performant scientific code is a series of algorithms
 joined by a series of translations from one data structure to
 another, each to support the next algorithm. The high-performance
 computing crowd calls any such code \emph{data movement,} as though
-it were excreted, but software engineers call it integration code
-and call the testing of it integration testing.
+it were replacing sets in the entracte,
+but software engineers call it integration code and know that
+integration testing is one of the most important kinds of unit test.
+
 
 \subsection{Integration testing data movement}
 
 A classic example of data movement is reorganizing a multidimensional
 array from one axis ordering to another. An algorithm with nested
 for-loops usually acts on nested axes. The order of the axes should
-put those for the inner loops last (for C and Python which are row-first), or put those
-same axes first (for R and Julia which are column-first). This so
+put those for the inner loops last (for \textsc{c} and Python which are row-first), or put those
+same axes first (for \rlang and Julia which are column-first). This so
 often controls the speed of an algorithm that it isn't considered an 
 optimization to fix it but an error to fail to set the order.
 
@@ -1173,28 +1183,35 @@ an edge-list representation to an adjacency matrix representation.
 Both have their place, but the correct form depends on the
 algorithm that will act on this data.
 
-The question isn't how to test data movement. It's that data
-movement is separate from the algorithm. It should be a separate
-function and tested on its own. It has its own set of faults,
-that center around integer arithmetic, the off-by one errors,
-the loop endpoint errors. These are different in nature from
-the taxonomy of faults that plague an algorithm-in-itself,
-but they are no less debilitating to correctness.
+Data movement tends to stress performance of memory access
+and integer arithmetic. It carries risks of off-by-one errors,
+loop endpoint errors, and assignment errors. These are different
+from the performance characteristics and likely faults in core
+algorithmic code, so they suggest data movement should be in its
+own function and should be tested separately, for both performance
+and efficient testing.
+
+This produces a mental model for a scientific application. It begins
+with translating configuration parameters from their specification
+to the values internally. Inputs are verified. Then the application
+is a series of data movement, followed by algorithm, and data movement
+for the next algorithm. Then results are written.
 
 \subsection{The CRUD case}\label{sec:crud}
 
 The prosaic brother to data movement is the ubiquitous selection
-and editing of data frames we do when reading and writing data.
-The data frame, in which this data typically lives, is the
-algorithmic equivalent of a minivan, fully equipped but less
-computationally intriguing.
+and editing of data frames when reading and writing data.
+The data frame is the algorithmic equivalent of a minivan, more
+about convenient pickup and drop-off than about getting from $A$
+to $B$. When we edit data frames, during save or load, or during
+data movement, the correct result is more a matter of software specification
+than a matter of difficult calculation.
 
-Dataframe manipulation for loading and saving data is more a matter
-of how we want to specify a program than about moving from
-one data structure to another. There is, happily, a framework
+A good testing method for data frame manipulation, is therefore
+unit tests that assert the output data frame meets a list of requirements.
+There is, happily, a framework
 for recording and conveying this work, the create-read-update-delete
-(CRUD) list.
-
+(CRUD) list. For example, if we were editing a mortality data frame:
 \begin{itemize}
 \item \textbf{Create} - If the input data doesn't have excess mortality,
   then derive it from cause-specific mortality and prevalence.
@@ -1204,27 +1221,19 @@ for recording and conveying this work, the create-read-update-delete
   locations because it tends to be sparse.
 \item \textbf{Delete} - All-cause mortality isn't included in this step.
 \end{itemize}
-
 These are requirements. Failure to meet one of these requirements
-often won't make the code stop running. It will harm confidence
-in the code.
+often won't make the code stop running. It's no less wrong.
 
-These tests are therefore classic boundary-value tests, where
+These tests are classic boundary-value tests, where
 we try parameters at the lower boundary, upper boundary,
 and middle of the range. Combinatorial testing can be appropriate
-across all parameters. What isn't mentioned in Jorgensen, for instance,
-is that input datasets are parameters. They are high-dimensional
-parameters which can make combinatorial testing quite large.
-You are asking not only whether the dataset is nonzero in length,
-as a boundary value, but whether each kind of data record is at
-any boundary value that it can take on. For all cases, the goal
-is to assert that requirements, as stated above in CRUD categories,
-are true for all parameter values.
+across all parameters, and we can often create a single data frame
+where each row represents a different test.
 
 \subsection{Example}
 This example, in Python, is a function with two arguments, but both
 are dataframes, just read from input files. Think of them as two spreadsheets
-with multiple rows and column headers ``x\_local'', ``a\_data\_id''
+with multiple rows and column headers \lstinline!x_local!, \lstinline!a_data_id!,
 and so on.
 \begin{lstlisting}[language=Python]
 def shift_priors(self, data, adj_data):
@@ -1277,14 +1286,15 @@ the possible values of each entry in each row of the input data?
 \end{tabular}
 \end{center}
 
-That makes $3\times 4 \times 3\times 2\times 2\times 4=576$ different inputs.
+\noindent{}That makes $3\times 4 \times 3\times 2\times 2\times 4=576$ different inputs.
 This excludes the effects of calling the function
 \lstinline!adjust_prior_by_mean_of_fit()!.
 
 What is the algorithmic complexity of this function? There is one
 if--then--else, so the answer could be three, but each condition in a dataframe
 selection is another path through the code. For instance,
-\lstinline!data.x_local == 0! is a conditional with two outcomes.
+\lstinline!data.x_local == 0! is a conditional with two outcomes, leading
+to very high algorithmic complexity, hidden in data frame arguments.
 
 A project manager can ensure good communication between the scientist and
 developer by writing \textsc{crud} assertions in English.
@@ -1300,15 +1310,8 @@ developer by writing \textsc{crud} assertions in English.
         priors for the same integrand.
 \end{itemize}
 Then we can write tests that verify these \textsc{crud} requirements for
-each of the 576 kinds of inputs. \aside{show the test}
+each of the 576 kinds of inputs.
 
-
-\subsection{Trust the movement}
-
-In order to test data movement separate from the main algorithm,
-we have to separate data movement from the main algorithm.
-This is one of those times that what is testable indicates what
-is modular in code.
 
 
 \section{Using symmetry to test a function}\label{sec:symmetry-test}
@@ -1348,8 +1351,9 @@ form of symmetry testing, which insists that some transformation
 of the inputs has a relationship with some transformation of the 
 outputs,
 \begin{equation}
-    f(g(x)) = h(y).
+    f(g(x)) = h(f(x)),
 \end{equation}
+where $f$ is the function under test, and $g$ and $h$ are the transformations.
 
 \begin{lstlisting}[language=R]
 mean_age_of_death <- function(m, n) {
@@ -1365,7 +1369,6 @@ test_that("dividing by a constant multiplies by a constant", {
   }
 })
 \end{lstlisting}
-
 There is a paper that shows symmetry testing catches a lot of bugs.
 
 What do I test when I test such a small equation?
