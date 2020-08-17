@@ -268,15 +268,18 @@ If we hadn't looked at the equation in detail, but we had implemented
 tests that probe the range of possible input values, then
 we would see the numerical problem arise.
 \begin{lstlisting}
-mx = [1.0, 0.9, 0.1, 1e-2, 1e-14, 0.0]
+mx = vcat([0.9 * 10.0^i for i in 0:-1:-17], [0.0])
 nx = ones(size(mx))
 ax = constant_mortality_mean_age(mx, nx)
-@assert all(ax .< .5)
+println(ax)
 for check in 2:length(ax)
     @assert ax[check] > ax[check - 1]
 end
+@assert all(ax .< .5)
 \end{lstlisting}
 This test asserts that the values get closer to 0.5 from below.
+Not only will the value at 0.0 yield a \nan, but also
+values before then return in the thousands or \textsc{Inf}.
 
 The unit test won't tell you how to fix the problem.
 (In this case, it's as easy as using a Taylor series near

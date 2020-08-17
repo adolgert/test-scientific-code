@@ -1,4 +1,4 @@
-function constant_mortality_mean_age(mx, nx, boundary = 1e-6)
+function constant_mortality_mean_age_corrected(mx, nx, boundary = 1e-6)
     result = copy(mx)
     upper = mx .>= boundary
     large_mx  = mx[upper]
@@ -13,7 +13,38 @@ function constant_mortality_mean_age(mx, nx, boundary = 1e-6)
     result
 end
 
-function constant_mortality_mean_age_uncorrected(mx, nx)
+function constant_mortality_mean_age(mx, nx)
     expx = exp.(-mx .* nx)
     (1 ./ mx) .- (nx .* expx) ./ (1 .- expx)
+end
+
+
+function langevin(x)
+    x / 3 / (
+        1 + x^2 / 15 / (
+            1 + x^2 / 35 / (
+                1 + x^2 / 63 / (
+                    1 + x^2 / 99
+                )
+            )
+        )
+    )
+end
+
+
+function langevin_mean_age(mx, nx)
+    x = mx .* nx * 0.5
+    mx .* x .* (1 .- langevin.(x))
+end
+
+
+function test_naive_mean_age()
+    mx = vcat([0.9 * 10.0^i for i in 0:-1:-17], [0.0])
+    nx = ones(size(mx))
+    ax = constant_mortality_mean_age(mx, nx)
+    println(ax)
+    for check in 2:length(ax)
+        @assert ax[check] > ax[check - 1]
+    end
+    @assert all(ax .< .5)
 end
