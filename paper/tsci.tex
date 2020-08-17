@@ -990,7 +990,7 @@ do user-level testing on scientific code.
 and there are a few survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
 
 
-\subsection{Example}
+\subsection{Example}\label{sec:parameter-wilson}
 This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
 
 This function finds standard error from effective sample size for two
@@ -1319,15 +1319,15 @@ each of the 576 kinds of inputs.
 Sometimes knowing the math of a software function lets you
 test the software, even when you have an oracle problem.
 \emph{Metamorphic testing} uses the symmetry of the math function
-in order to test the correctness of the software function~\cite{ding2016,guderlei2007,kanewala2015,liu2014}.
+in order to test the correctness of the software function~\citep{ding2016,guderlei2007,kanewala2015,liu2014}.
 
 The mathematical description of a function is that it relates
 a domain (input) to a range (output). We write $f(x) = y$.
 If the function is an exponential, then $e^{-x} = 1 / e^x$,
 so $f(-x) = 1 / f(x)$. We may not know what the value of
-$e^2.4$ is, but we do know it's $1 / e^{-2.4}$.
+$e^{2.4}$ is, but we do know it has to match $1 / e^{-2.4}$.
 
-Here's another example. Given a mortality rate, $m$, the
+Here's a longer example. Given a mortality rate, $m$, the
 mean age of death over an age interval, $n$, is
 \begin{equation}
     a = \frac{n - n(1+m n)e^{-m n}}{1 - e^{-m n}}.
@@ -1339,7 +1339,6 @@ If we notice that this equation can be written
 then we can design an interesting test.
 \begin{eqnarray}
     \frac{a}{n} &= &f_1(m  n) \\
-    \frac{a}{n} &= & f_1((2  m)  (n / 2)) \\
     \frac{a/2}{n/2} &= & f_1((2  m)  (n / 2)) \\
     a /2 &= & (n/2) f_1((2  m)  (n / 2)) \\
     a &= &2 * f(2m, n/2) \\
@@ -1369,12 +1368,13 @@ test_that("dividing by a constant multiplies by a constant", {
   }
 })
 \end{lstlisting}
-There is a paper that shows symmetry testing catches a lot of bugs.
 
-What do I test when I test such a small equation?
-a) typing. It's not small enough not to make a mistake, if you're like me.
-b) math of floating point. Small m or n leads to numerical problems.
-You decide whether you care about small m.
+Metamorphic testing is an assertion about a symmetry relationship between
+the domain and range of a function. Because it's an invariant at the top-level
+of the function, it has an opportunity to find simple faults in algebra,
+grouping of terms, or off-by-one errors. It also has an opportunity to
+find faults that result from denormalization or loss of significant digits
+in floating-point math.
 
 
 \begin{callout}
@@ -1393,9 +1393,9 @@ a function?
 
 Let's say you have a cluster of computers. They are all Intel machines,
 but they come from different years. They could be different architectures
-or just different steppings of the CPU, which is the least difference
+or just different steppings of the \cpu, which is the least difference
 one can have between two chipsets. You compile code on one machine,
-or you install some R package that compiles code underneath. When
+or you install some \rlang package that compiles code underneath. When
 you move to another computer on another day, that same code fails
 to run with the message, ``invalid opcode.''
 
@@ -1404,7 +1404,7 @@ yesterday knew a command that's slightly too fancy for the computer
 you're using today, and it failed. You have to clean out the code
 and recompile today. It's not that the new computer is just older.
 It's still possible that, were you to switch back, there might be
-the same message again. The history of CPU opcodes isn't a forward
+the same message again. The history of \cpu opcodes isn't a forward
 march into a larger, better set.
 
 That scenario would be annoying, and it's a headache for people
@@ -1419,7 +1419,7 @@ software runs on the other computer but gives the wrong error.
 It can fail silently. This seems like an abrogation of a compiler's
 contract with its faithful coder, but it isn't. That compiler
 ensured that the code ran well enough on one target architecture.
-The problem is that compiler optimizations at level O3, and above,
+The problem is that compiler optimizations at level \textsc{o3}, and above,
 are willing to make slightly riskier choices that yield great
 performance benefits. These choices are tuned to the architecture
 at hand, or as requested by compiler options, and, while they may
@@ -1429,8 +1429,9 @@ that don't clearly represent time-saving invariants and of coders
 who can't afford motorcycles.
 
 There's a solution for this, too. Turn all optimizations down
-to O2 or lower. Or claim that the CPU uses the SSE2 instruction set.
-Unless you're intentionally commemorating the death of Phil Katz, you'll see
+to \textsc{o2} or lower. Or claim to the compiler that the \cpu
+understands no later than the \textsc{sse2} instruction set from 2000.
+Unless you're intentionally commemorating the year Phil Katz died, you'll see
 this as a severe loss of performance.
 
 The last option to deal with this problem is called acceptance
@@ -1455,7 +1456,7 @@ themselves, or run first~\cite{yoo2012regression}.
 
 \subsection{Documentation defines what a function wants to be}
 
-The section above, on parameter testing, uses a function that's a hybrid
+Sec.~\ref{sec:parameter-wilson}, on parameter testing, uses a function that's a hybrid
 between Wilson's score interval and a Poisson estimator. That hybrid
 doesn't have a name, and there's no paper or Wikipedia entry for it.
 We can test that its output is a continuous function of its input
@@ -1468,8 +1469,8 @@ outside the room. It includes reviewers. It includes future versions of the team
 
 The tests can be a clear statement of the contract this function upholds.
 So, too, can project documents, as mentioned in the data movement section,
-where CRUD defines selection from a dataframe. Documentation isn't just
-another link in the chain of understanding. It is where the software
+where \textsc{crud} defines selection from a dataframe. 
+Function documentation, in particular, is where the software
 developer, the one who wrote the function, states their understanding
 of the contract that function fulfills. It's the closest statement,
 in English, of what unit tests should assert.
@@ -1505,11 +1506,10 @@ describe its expected behavior. Someone could raise an observation
 that brute force solution is suprisingly possible.
 The team could discuss likely sets of parameters that might
 matter, some determined by the math, some by logic in the
-code. A product manager could supply CRUD requirements.
+code. A product manager could supply \textsc{crud} requirements.
 A systems engineer could describe the expected architectures
-and risk of failure due to optimization levels. Whether these
-are separate people or roles for a very few people, their
-communication gives testing the best chance at relevance.
+and risk of failure due to optimization levels. Every section
+of this document is a prompt for conversation.
 
 Testing well is helpful, but we saw, in the section about
 data movement, that identifying what is data movement
@@ -1523,7 +1523,8 @@ understanding where new things are added and less useful
 ideas are dropped.
 
 In this research environment, collaboration on testing
-creates commonly-understood, trusted functions. These, more
+creates commonly-understood, trusted functions. This shared
+agreement on the (tested) entities with which we do our work, more
 than any single snapshot of the whole calculation, are
 what the group understands about the code. These trusted
 functions will be copied into other projects, translated
@@ -1531,20 +1532,31 @@ to other languages. They will exist long beyond the work
 that has your name.
 
 \section{Further Reading}\label{sec:further-reading}
+
+The most complete books on general software testing offer a sound
+basis for testing any kind of code. I recommend starting with
+\emph{Software Testing: A Craftsman's Approach,}~\citep{jorgensen2013},
+while skipping its chapter on set theory, and then taking a look at
+\emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\citep{pezze2008},
+if you haven't had enough.
+
+The complexity of scientific code not only makes it difficult
+to test but also mummifies past working code. Lest such a mummy
+come to life in your hands, look at \emph{Working Effectively with Legacy Code,}~\citep{feathers2004working}.
+
+There are several sources directed at scientific developers, for
+construction of code, as well as testing. These are some recent highlights:
 \begin{itemize}
-	\item \emph{Software Testing: A Craftsman's Approach,}~\cite{jorgensen2013}.
-	\item \emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\cite{pezze2008}.
-	\item \emph{Working Effectively with Legacy Code,}~\cite{feathers2004working}.
 	\item \emph{Software Engineering for Science,}~\cite{carver2017}.
 	\item ``Testing Scientific Software: A Systematic Literature Review,''~\cite{kanewala2014}.
 	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
-	\end{itemize}
+\end{itemize}
 
 \appendix
 
 \section{Faults in Mathematical Code}\label{sec:faults-and-failures}
 
-For each section, ask \aside{what faults does this technique limit?}
+For each section, ask what faults does this technique limit?
 For instance, using a limit test for constant-mortality mean age
 ensures you don't have a numerical fault.
 
