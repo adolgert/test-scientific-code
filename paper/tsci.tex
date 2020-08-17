@@ -283,11 +283,11 @@ values before then return in the thousands or \textsc{Inf}.
 Once you see the problem in the unit test, it's possible
 to rearrange the equation to avoid
 division by zero. In this case, the distance from the limiting
-value of $n_x/2$ is the Langevin function, which has excellent
-limiting forms near zero.
+value of $n_x/2$ is the Langevin function, $L(x) = \mbox{coth}(x) - 1/x$,
+which has well-known limiting forms near zero.
 \begin{lstlisting}
 function constant_mortality_mean_age(mx, nx)
-    (nx / 2) .* (1 .- langevin.(mx .* nx / 2))
+    (nx / 2) .* (1 .- langevin_function.(mx .* nx / 2))
 end
 \end{lstlisting}
 This equation is stable near zero mortality rate.
@@ -846,6 +846,18 @@ but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
 and so on. If the function should divide by zero for some
 number, then that, too, is a parameter for which the function
 has a known value, an exception.
+
+Another kind of limit is the distance between function results
+as the function inputs get closer to each other. We can often
+find faults in a function by testing continuity of the output.
+Here, a good unit test would mirror the definition of Lipshitz continuity.
+\begin{lstlisting}[language=python]
+C = 2.0
+for (x1, x2) in [(0, 1), (0, .1), (0, .001)]:
+    assert f(x2) - f(x1) < C * (x2 - x1)
+\end{lstlisting}
+The \lstinline!C! variable is a bounds on the slope for any
+pair of numbers.
 
 Sometimes a limit of a function is the same limit you know
 from high school precalculus,
