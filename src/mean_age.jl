@@ -19,6 +19,7 @@ function constant_mortality_mean_age(mx, nx)
 end
 
 
+# The Langevin function is coth(x) - 1/x
 function langevin(x)
     x / 3 / (
         1 + x^2 / 15 / (
@@ -33,8 +34,7 @@ end
 
 
 function langevin_mean_age(mx, nx)
-    x = mx .* nx * 0.5
-    mx .* x .* (1 .- langevin.(x))
+    (nx / 2) .* (1 .- langevin.(mx .* nx / 2))
 end
 
 

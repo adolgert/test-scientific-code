@@ -280,10 +280,18 @@ end
 This test asserts that the values get closer to 0.5 from below.
 Not only will the value at 0.0 yield a \nan, but also
 values before then return in the thousands or \textsc{Inf}.
+Once you see the problem in the unit test, it's possible
+to rearrange the equation to use a function that avoids
+division by zero, for instance, the Langevin function.
+\begin{lstlisting}
+function constant_mortality_mean_age(mx, nx)
+    (nx / 2) .* (1 .- langevin.(mx .* nx / 2))
+end
+\end{lstlisting}
+This equation is stable near zero mortality rate.
 
 The unit test won't tell you how to fix the problem.
-(In this case, it's as easy as using a Taylor series near
-$m_x=0$.) It can show places where more numerical analysis is
+It can show places where more numerical analysis is
 needed in order to have a stable representation of the math.
 
 
@@ -607,7 +615,7 @@ The equations above are the result of integrating a function that has fewer
 steps, even though it would be slower to run.
 \begin{eqnarray}
   \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
-  {}_nm_x & = &\frac{\int_{x_n}^{x_{n+1}}\mu(s) \exp(-\int_{x_n}^s\mu(a)ds)ds}{\int_{x_n}^{x_{n+1}}\exp(-\int_{x_n}^s\mu(a)ds)ds}.
+  {}_nm_x & = &\frac{\int_{x}^{x+n}\mu(s) \exp(-\int_{x}^s\mu(a)ds)ds}{\int_{x}^{x+n}\exp(-\int_{x}^s\mu(a)ds)ds}.
 \end{eqnarray}
 The resulting ${}_nm_x$ should be the same as that above within
 machine precision, where machine precision means that we expect a drift
