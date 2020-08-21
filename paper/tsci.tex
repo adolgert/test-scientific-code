@@ -67,13 +67,32 @@ code. Some techniques are adaptations of traditional unit testing methods
 and others are particular to testing scientific code.
 \end{abstract}
 
+% Audience:
+% a) researchers who write code but don't know how to turn notebooks
+%    into unit tests.
+% b) software engineers who implement code but aren't sure how to handle
+%    tests of squirrelly math.
+
 % From Mike Richards
-% 1. When you make parallel implementations, start with the dead-simple slowest.
 % 2. Focus on moving up and down the stack, not between scientist and developer.
 % You don't need to tell them everything about the subject.
+% Alec contributed Pearson
+% James presses about the audience and software vs. math.
 
+% TODO
 % This is limited to functional testing, not performance or other.
 % Missing: fault localization, model-based testing
+% Read random testing paper.
+% add simple stats tests from the intro modern stats book
+% add truth about domain clash between software and math.
+% add figures to explain pearson coefficient
+% explain mantiss and exponent.
+% focus floating point on what they need to know, not an exceptions list.
+% learn more on acceptance testing.
+% add more symmetry examples.
+% Read more recent mutation test papers to be fair to it.
+% show path analysis and flow analysis as figures.
+
 \flushbottom
 \maketitle
 \thispagestyle{empty}
@@ -100,6 +119,28 @@ always have behavior we can discover, characterize, and assert in a unit
 test. Some of that behavior is approximate, that the result be near a
 value. Some is exact, in a limit or at a boundary.
 
+It's this mathematical behavior that is our first concern for testing.
+It's called functional testing, when we look for faults in the code
+that would lead to failures when the code runs. We can exclude, here,
+questions of testing how long a function runs, how much memory it uses,
+whether it's secure, or whether it's usable.
+
+Even with this scope, of whether the function will, in the future,
+give the right answer, it will become clear, that, as complex as
+code looks on a monitor, the work to reassure ourselves that it lacks
+faults, that there is no character out of place, would be terribly more
+work than to write the function. If each part of a scientific application
+had an exhaustive suite of tests, it would become brittle to change,
+the opposite of a tool for research.
+
+The code we test has a topography of risk. Some of it is measurable,
+as a number of if--then statements or a count of equation terms.
+Some of it is a landscape of doubt, that these lines of code are
+doing their job or that that language idiom is properly-written.
+When a function fails to read a file, and it quits, that's less
+a problem than a function that reads a file incorrectly and gives
+a wrong result.
+
 Assuming we've read a good unit testing book like \cite{jorgensen2013},
 and that we can figure out, elsewhere, the construction of unit tests
 in code, let's assess here the risks that are unigue to scientific code.
@@ -122,7 +163,7 @@ One part of it is simple, that almost every language follows the
 \ieee~754 standard.
 A little book called \emph{Numerical computing with IEEE floating point arithmetic}
 describes both the \ieee~754 standard
-and some common implications for how you write equations in code~\citep{overton2001numerical}.
+and some common implications for how you write equations in code~\citep{overton2001numerical,goldberg1991every}.
 The complicated part is that the application, compiler,
 and even operating system act as filters to decide whether the same division
 by zero will raise an exception, return infinity, or silently return not-a-number (\nan).
@@ -147,7 +188,7 @@ language-level exception.
     in plus or minus zero, or the smallest representable number,
     or a special value called a subnormal.
     \item \emph{Inexact}---The result can't be represented exactly
-    with the \ieee standard. Yes, this almost always happens.
+    with the \ieee standard. For example, 2.0 / 3.0. This happens a lot.
 \end{itemize}
 In some cases, these floating point exceptions will result in termination
 of a program. In other cases, the result is silently replaced
