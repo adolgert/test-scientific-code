@@ -72,6 +72,8 @@ and others are particular to testing scientific code.
 % 2. Focus on moving up and down the stack, not between scientist and developer.
 % You don't need to tell them everything about the subject.
 
+% This is limited to functional testing, not performance or other.
+% Missing: fault localization, model-based testing
 \flushbottom
 \maketitle
 \thispagestyle{empty}
@@ -165,7 +167,7 @@ For instance, if a Python Pandas data frame returns a \nan when it
 takes a square root of a negative number, and my code relies that behavior,
 then I make a test that runs negative data through the code.
 \begin{lstlisting}[language=Python]
-def test_f():
+def test_sqrt_negative_is_nan():
     df = pd.DataFrame({"a": [3.0, -3.0]})
     df.b = np.sqrt(df.a)
     assert(np.isnan(df.b[1]))
@@ -213,7 +215,7 @@ Machine epsilon is the smallest difference in the mantissa,
 excluding the exponent, so if you want to test that two
 floating point numbers are equal, you test relative error using
 machine epsilon.
-\begin{lstlisting}[language=R]
+\begin{lstlisting}
 n <- 4
 same <- x * (1 + n * machine_epsilon) > y && x * (1 - n * machine_epsilon) < y
 \end{lstlisting}
@@ -408,7 +410,7 @@ and aren't collinear.
 For a single $y$ that depends on a single $x$, the equation
 is a few lines of code.
 \begin{equation}
-r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})}}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
 \end{equation}
 It conveniently generalizes to more dimensions.
 
@@ -909,7 +911,7 @@ Given a set of possible equivalence classes for each parameter, use a random
 number generator to choose one of each. Do this as many times
 as runtime allows. When using this method, it's critical to
 report not only failing tests but also the exact set of parameters
-that made the tests fail.
+that made the tests fail~\citep{arcuri2011random}.
 
 Randomized test cases are easy to implement, and they can
 supplant the author's duty to identify the greatest risks
