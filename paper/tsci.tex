@@ -92,6 +92,7 @@ and others are particular to testing scientific code.
 % add more symmetry examples.
 % Read more recent mutation test papers to be fair to it.
 % show path analysis and flow analysis as figures.
+% Add a 4.6 on testing against a fixed list of known good values.
 
 \flushbottom
 \maketitle
@@ -549,10 +550,17 @@ something known about the answer. Every unit test is two
 functions, the function under test and a parable
 of that function, written into the unit test itself.
 
-There are times that it's reasonable to write a test version
-of a function, some second, similar way. In fact, we most often write
-a function first using its most obvious, probably slowest, algorithm.
-The obvious algorithm is an excellent unit test on any refinement.
+Often, we're given code that has some functions that do important
+work but have too little documentation and no tests. It's easy
+to add tests, in this situation, in order to understand what
+those functions do. The tests can then tell the story of how
+to set up data for those functions and work with their output.
+
+An easy form of parallel implementation is the previous version
+of a function. Given the task to write code, the programmer will
+start with the simplest version that does the task, and then they
+iterate to make it better. That simplest version makes an excellent
+parallel implementation for use case testing.
 
 We can find an appropriate parallel implementation for testing by
 looking at the set of choices we make when writing the original function
@@ -568,7 +576,7 @@ scientific software, and we'll add one step before theirs.
 \end{enumerate}
 If only the algorithm in the code changes, then the results
 should be quite similar. If the models are discretized differently,
-then it takes more care to use one for testing of the other.
+then it takes more analysis to use one for testing of the other.
 Which you choose depends on the kinds of faults you think pose
 the most risk in the code.
 
@@ -741,7 +749,7 @@ result from that function. The parallel implementation, in this case,
 is the previous version of the same function.
 
 There is a book called \emph{Release It!} that says we should
-``make regression testing easy,''~\cite{nygard2018release}. It's hard to make it easy
+``make regression testing easy,''~\citep{nygard2018release}. It's hard to make it easy
 because unit tests are built to test, not save output. Even if
 they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
@@ -870,7 +878,7 @@ number of tests above would be $60\times 6 = 360$.
 
 \subsection{Limiting values of parameters}\label{sec:limits}
 
-Not every parallel implementation is an brute-force retelling
+Not every parallel implementation is a brute-force retelling
 of a model. Most mathematical functions provide finger-holds
 support of their correctness.
 
