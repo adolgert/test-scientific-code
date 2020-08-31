@@ -93,6 +93,13 @@ and others are particular to testing scientific code.
 % Read more recent mutation test papers to be fair to it.
 % show path analysis and flow analysis as figures.
 % Add a 4.6 on testing against a fixed list of known good values.
+% Take a failing test and reduce the input until you have
+% a smallest failing test. Very helpful for identifying failures.
+
+% High level tests will test more.
+%                  will make it harder to find a fault.
+%                  will make it harder to identify a _failure._
+
 
 \flushbottom
 \maketitle
@@ -800,6 +807,11 @@ missing values, zero values, or unusually sharp rises or falls in
 mortality rate. Sets of parameters that probe the same faults in
 the function under test are called \emph{equivalent.}
 
+% This is called Partition testing
+% You split by functionality, specification, requirements,
+% or you split by statement coverage, code coverage, branch coverage.
+% 
+% If everything in a partition fails, it is "homogeneous."
 Methods to test parameter logic all have the same underpinning,
 that they will try to test at least one set of parameters from
 each of the equivalence classes of inputs. Deciding what is an
@@ -956,17 +968,43 @@ address risks in the code most efficiently.
 
 
 \subsubsection{Random parameter choices}
-Given a set of possible equivalence classes for each parameter, use a random
-number generator to choose one of each. Do this as many times
-as runtime allows. When using this method, it's critical to
-report not only failing tests but also the exact set of parameters
-that made the tests fail~\citep{arcuri2011random}.
 
-Randomized test cases are easy to implement, and they can
-supplant the author's duty to identify the greatest risks
-in the code. The main drawback is time to run this kind of
-test, especially because it's tempting to play the lottery
-by letting it keep running.
+The hardest part of generating test cases is choosing parameters
+that will find the most failures in the shortest time. Equivalence
+classes tell you which parameters will find the same failures,
+so they tell you which tests would be redundant. Given a set
+of tests, it's better to throw out those that are redundant,
+but the work to generate tests that aren't redundant can be cumbersome.
+The work to establish equivalence classes requires care,
+and sometimes parameters that seem equivalent might generate
+different failures.
+
+Randomized parameter generation avoids these problems. It's easier
+to generate parameters from a range or a set and to mix and match
+them at random. The tests might run longer to find a failure, but
+the tests are much faster to write, and you always know that longer
+runs have a better chance to find a failure. Every time you
+run twice as many tests, you increase the possibility of finding
+tests by fifty-percent. That's one kind of well-behaved.
+
+This doesn't mean the inputs have to be entirely random. For
+instance, if an input is a vector of numbers, it makes sense
+to randomly draw a length for the vector and then randomly
+draw each of the numbers, because using a random bit pattern
+would mean almost all vectors are near the maximum length.
+A vector that's created with a length draw is still random,
+but it's biased towards shorter vectors, because these tend
+to find faults in algorithms.
+Random parameters choices can be biased to choose more often
+those parameter sets that are more commonly used. They can
+be biased towards edge cases that might find failures. Either way,
+they are usually random with probability weights.
+
+Because random parameter generation is straightforward
+and predictable, it is very common and highly effective~\citep{arcuri2011random}.
+It makes most sense when unit tests don't take long to run
+and when it is possible to assign a known true answer, or trait
+of an answer, for all possible inputs.
 
 
 \subsubsection{Combinatorial excursions}
