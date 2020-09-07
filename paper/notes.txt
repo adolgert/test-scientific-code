@@ -1,0 +1,28 @@
+From the IEEE 2010, what are your goals with classification? Our goal is minimizing risk.
+
+This is the Orthogonal Defect Classification, which is more used than the IEEE standard. chillarege1996orthogonal.
+
+Risk = chance of happening x how bad it is. From the IEEE doc.
+
+"deviations to intent, which warrant change" (ODC)
+
+Raleigh model of defect discovery. Simple and intuitive.
+
+ODC defect type: assignment, checking, function, interface, timing.
+
+Function - a function defect is one that affects significant capability, end-user features, product application programming interface (API), interface with hardware architecture, or global structure(s). It would require a formal design change.
+
+Assignment. Converseley, an assignment defect indicates a few lines of code, such as the initialization of control blocks or data structure.
+
+Interface. Corresponds to errors in interacting with other components, modules, device drivers via macros, call statements, control blocks, or parameter lists.
+
+Checking. Addresses program logic that has failed to properly validate data and values before they are used, loop conditions, etc.
+
+Timing / serialization. Timing/serialization errors are those that are corrected by improved management of shared and real-time resources.
+
+Build/package/merge. These terms describe errors that occur due to mistakes in library systems, management of changes, or version control.
+
+Documentation. Errors can affect both publications and maintenance notes.
+
+Algorithm. Errors include efficiency or correctness problems that affect the task and can be fixed by (re)implementing an algorithm or local data structure without need for requesting a design change.
+
