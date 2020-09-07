@@ -108,6 +108,11 @@ and others are particular to testing scientific code.
 \tableofcontents
 \section{Introduction}\label{sec:introduction}
 
+\begin{itemize}
+    \item Set scope: functional, the right answer.
+    \item Not performance, security, usability.
+\end{itemize}
+
 The code for a scientific application, laid out across a monitor,
 will have plenty of functions that look like those of any other application.
 It will parse command-line flags, parse input files, and maybe even have
@@ -157,8 +162,80 @@ and how some new tools might help when the stakes are high.
 
 
 
+\section{What's a problem}
 
-\section{Testing Numbers}\label{sec:ieee-numbers}
+Debugging code can take longer than writing it. You can see
+a wrong answer and spend hours trying to figure out where the
+calculation went wrong, in what function, in what data structure,
+at what assignment statement.
+Writing unit tests is like debugging code before you know
+where the bugs are.
+
+We prepare to test code by walking backwards, starting with
+what we consider a problem. For this work, we want to find
+ways the code will stop prematurely (or never stop)
+and ways it will give a wrong answer masquerading as a right one.
+
+Failures are evidence something went wrong. Since our main goal
+is scientific correctness, we classify failures on two axes,
+whether they are recoverable and how long it takes to discover
+the failure. Some algorithms are allowed to fail for certain
+input values, and we can recover by running a different, acceptable
+algorithm. Failures can be immediate exceptions that provide
+debugging information, or abnormal termination that quits with
+only a single error code, but they
+could be \nan{}s that silently propagate through code. They
+could be loops that don't terminate, so you wait hours to find
+the problem. Worst, they could be wrong numbers that are
+close, but not close-enough.
+
+Failures come from defects in the code, which we call \emph{faults,}
+and we classify these so that we know which are most important
+to our task (ODC).
+
+\begin{itemize}
+    \item \emph{Algorithm}---These are correctness problems
+    that can be fixed within a function or local data structure.
+    This includes both whether an equation is correct and whether
+    a loop has an off-by-one error.
+
+    \item \emph{Assignment}---These are incorrect initialization
+    of control blocks or data structures.
+
+    \item \emph{Checking}---Program logic around loop conditions
+    and branching statements. A mistaken condition can mean that
+    the result would be correct for a different set of parameters.
+
+    \item \emph{Interface}---Defects when calling other components
+    or functions. This includes parameter lists.
+
+    \item \emph{Input/Output}---Faults when reading and writing
+    data from/to any other component.
+
+    \item \emph{Documentation}---Whether it's published documentation,
+    code documentation, or maintenance notes, there can be
+    correctness errors here.
+\end{itemize}
+
+While algorithm defects are immediate threats to correctness, we
+tend to find them early in development and testing, and
+tests in assignment and checking are no less harmful.
+
+We use unit tests to look for faults, but unit tests observe
+failures. We can test less, and test better, by understanding
+how to read code so that we see cause and effect.
+
+
+\section{Path and data flow}
+
+We find problems in code by reading it, by testing it, or
+by running it. Both reading and testing rely on our ability
+to see cause and effect in code.
+
+
+
+
+\section{Testing numbers}\label{sec:ieee-numbers}
 
 The first thing that makes us call code scientific is the numbers themselves.
 Floating-point math causes its own kinds of failures. Some of these are simple,
@@ -347,205 +424,37 @@ The unit test won't tell you how to fix the problem.
 It can show places where more numerical analysis is
 needed in order to have a stable representation of the math.
 
+\section{Parameters in scientific code}
+If we need to implement some matrix algorithm, then
+we might make a function that has a few arguments: the matrix of data, algorithm parameters
+to control cutoffs in the algorithm, and options to determine whether
+the result is written back into the source matrix memory.
+The data, algorithm parameters, and options are all, in the eyes of unit testing,
+parameters.
 
-\section{Statistics for Testing}\label{sec:statistical}
-
-\subsection{Randomized calculations should give different answers each time}
-
-A simple Gaussian elimination can benefit from random pivoting.
-A function to sample a distribution is supposed to return a new value
-every time it's called.
-Some functions introduce random reorderings
-so they can insist that the caller not expect a given order
-in the output. All of these perfectly useful functions
-thwart using simple lookup tables to test their output.
-
-The tests, themselves, can be the problem when we randomly
-generate test cases. I'll check
-a life expectancy function against a corpus of life expectancies
-for every country. I'll randomly generate user input
-to see that a functions succeeds or gracefully fails.
-
-When testing these random functions,
-we have on our side some basic tools
-of statistics. Some, like mean square error, are ways
-to heap our uncertainty into a single, tidy number.
-Others are formal statistical
-tests. They take a clear side-effect of a function,
-its randomness, and tame it to measurable uncertainty.
-Let's look at just a few examples.
-
-\subsection{Approaches}
-
-\subsubsection{Error estimation}
-When the function under test returns a vector of values,
-and I want to compare it with a vector of known values,
-I use an estimator, like mean-squared error, of the difference
-between the two.
-
-The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
-It takes the whole set of values and reduces it to one number I can assert must be less than some value.
-
-When values range from small to large, it's convenient to use
-relative error instead of absolute error.
-\begin{equation}
-  \mbox{relerr} = \frac{\hat{Y}_i - Y_i}{Y_i}
-\end{equation}
-The known value is always in the denominator.
-
-Even more reassuring for a unit test, I can take all of the
-sets of values and take the maximum absolute error,
-$\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
-some boundary value whose crazy-high error is hidden beneath
-low error everywhere else.
-
-\subsubsection{Variance, standard deviation}
-When there is just one vector of random numbers coming out
-of a function, it can be helpful to characterize how far
-they are from their average value. The variance is
-the average of how far each value is from the average of all
-values,
-\begin{equation}
-  \mbox{var}(Y) = \frac{1}{N}\sum_i (Y_i - \bar{Y})^2,
-\end{equation}
-but you'd use the always-avaiable
-as \lstinline!var! or \lstinline!variance! in any language.
-The standard deviation is the square root of variance.
-
-If variance is zero, then every value in the vector is
-the same. There are some functions, such as the Cauchy
-distribution, that don't have a variance. For such a function,
-the value of the variance will keep increasing as the
-number of draws of the function increases, instead of
-converging to a single value. This, in itself, is a
-testable property of a function.
+These three kinds of parameters, however, tend to affect functions
+differently. Options appear in the test of if--thens, so they change
+the code path. The code path is the sequence of blocks of code that execute
+for a particular set of parameters.
+Algorithm parameters tend to appear in key equations, so that they
+affect data flow in a function. The data flow is a graph
+of which values in a function depend on which previous values.
+The input matrix, itself, is effectively a two-dimensional matrix of
+parameters, greatly increasing the number of possible inputs to a function.
 
 
-\subsubsection{Confidence interval}
 
-Assume there is a function with randomness, that produces floating-point numbers. Those results
-have some average value, but they vary around that average value.
-If we run this function a thousand times and take the
-lower value, below which 2.5\,\% of the results fall,
-and the upper value, above which 2.5\,\% of the results fall,
-then this interval is the 95\,\% standard deviation.
-
-For research statistics, the standard deviation is often part
-of an argument that a model of a problem is appropriate to
-the observed data. For unit testing the standard deviation
-is a rule of thumb for how often a perfectly good unit test
-will randomly fail. If you want it to fail five percent of
-the time, use a 95\,\% interval. If you want it to fail
-one time in a thousand, use a 99.9\,\% interval.
-
-Given that results from a function are random, and we
-want to make some cutoff on which results are acceptable,
-we want to choose a cutoff that is informative, so it's
-close to the average good value. On the other hand, we don't
-want it to fail a lot. The standard deviation tells us
-how much push luck in either direction.
-
-\subsubsection{Pearson coefficient}
-Let's say the output of a function is a set of $y$ values,
-and the input is a set of $x$ values. You may not know
-how $y$ depends on $x$ exactly, but you know that it
-does. The Pearson coefficient is a function of
-$N$ $y$ values and $N$ $x$ values that will return a number
-between -1 and 1, where -1 is a line with a downward slope,
-1 is a line with an upward slope, and 0 means the points
-are evenly arranged so that they don't slope up or down
-and aren't collinear.
-
-For a single $y$ that depends on a single $x$, the equation
-is a few lines of code.
-\begin{equation}
-r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
-\end{equation}
-It conveniently generalizes to more dimensions.
-
-The Pearson coefficient is a handy, if imprecise,
-set of guard rails on the behavior of a function.
-It quickly determines whether the output rises or falls with the input,
-even in the presence of noise. It can say whether the output
-isn't linear enough, or whether it's too linear.
-It even has a multidimensional generalization for data that
-has multiple $x$ and $y$ values.
+\section{Complexity}
 
 
-\subsection{Taming randomness}
-
-I make tests with random inputs, so they explore more alternative
-paths in the code than I might guess. I run tests of random
-functions a thousand times so that they have more chances to
-show a real bug. Randomness in testing is a free source for
-finding faults, and it's a constant headache.
-
-In order to use the statistical tests above, I need to choose
-a cutoff on what is a passing test and what is a failing test.
-If I choose a cutoff that's useful for finding faults, it will
-always fail for some percentage of tests. For a 95\,\% confidence
-interval, it will fail 5\,\% of the time. Even for a
-99.9\,\% confidence interval, it will fail once in a thousand
-tries. This means the green lights of a unit test display will
-be red without reason once in a thousand times, but that's
-enough not to pay attention to a red light. It's a lure to
-rerun the test suite every time there is any red light.
-It's a waste of attention.
-
-The solution is simple. Fix the seed for the random number
-generator for each test that has randomness. The random
-seed determines the exact set of random values that will
-follow. If the test passes for a particular random seed,
-then it will always pass for reruns of the unit test until
-some fault is introduced.
-
-The simple solution is sometimes impossible and always
-disappointing. Most programming languages offer the tremendous
-convenience of calling \lstinline!rand()! anywhere in the
-code, which uses a global random number generator. Sometimes
-\rlang code calls \lstinline!rand()! and then calls \cpp code
-that calls \lstinline!rand()! from a different random number
-generator. Authors
-of code unfortunately use this convenience, creating side-effects
-for testing. Only sometimes can we make a repeatable
-stream of random numbers by declaring a specific random number generator
-and passing it to a function.
-
-(It's also possible to greatly reduce the rate of failure
-for a statistical test, even with the same 99\,\% cutoff
-on acceptable results, if we take the same hundred tests
-and use the statistical framework to treat them as ten sets
-of ten tests.)
-
-Let's say we can fix the seed for a function, and for all the
-functions it calls. The joy of randomized testing is that more
-runs might yield more faults in the code. We
-can still do lots of runs by creating a unit test that is run once
-for a set of seeds.  The procedure is to define a starting seed and run against
-the next thousand seeds. When the test shows no real faults,
-choose a starting seed for which the next thousand all pass
-the test within some tolerance. This is less simple, but it
-explores the space of tests and is likely to signal when
-a real fault arrives.
-
-\subsection{Conclusion}
-
-Some kinds of unit tests are absolute. When they pass,
-there is no fault in this one path through the function.
-Statistical tests don't give that guarantee. The function
-under test could be close-enough to the desired value but
-still have a fault in some code path.
-At the same time, statistical tests can find faults
-in places you weren't looking, because they summarize all
-of the outputs of a function or because they summarize
-the behavior of multiple runs of a function.
-
-If we were testing a typical function, for which we knew the
-right answer, that unit test would offer the meager assurance that,
-for one set of parameters, the function is correct.
-Statistical tests, like those above and many more statistical
-tests not mentioned, can assert that, for one set of parameters,
-a function isn't too wrong.
+\textbf{Mathematical Complexity}---Has your code editor ever told you,
+"Computational complexity 16, project limit is 15. Please refactor?"
+\emph{Computational complexity} looks at every if--then--else and counts the
+number of possible paths through a function.
+Scientific code has high \emph{mathematical complexity,\/} which is a
+count of the number of mathematical operators and function calls in
+a function. Would you want your linter to insist on low mathematical complexity in
+a function?
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
@@ -773,26 +682,337 @@ the code, but mid-level functions will change less frequently,
 and there's a chance to guess why they changed.
 
 
+\subsection{Testing the compiler}\label{sec:test-compiler}
+
+Let's say you have a cluster of computers. They are all Intel machines,
+but they come from different years. They could be different architectures
+or just different steppings of the \cpu, which is the least difference
+one can have between two chipsets. You compile code on one machine,
+or you install some \rlang package that compiles code underneath. When
+you move to another computer on another day, that same code fails
+to run with the message, ``invalid opcode.''
+
+An opcode is a machine-language instruction. The computer you used
+yesterday knew a command that's slightly too fancy for the computer
+you're using today, and it failed. You have to clean out the code
+and recompile today. It's not that the new computer is just older.
+It's still possible that, were you to switch back, there might be
+the same message again. The history of \cpu opcodes isn't a forward
+march into a larger, better set.
+
+That scenario would be annoying, and it's a headache for people
+saddled with heterogenous clusters. They solve it with, for instance,
+creating architecture-specific shared drives so that they can
+install a different version of the software for each version of
+system architecture on the cluster. That scenario is, however, a
+best case scenario.
+
+The worse scenario, and I wish this were rarer, is that the
+software runs on the other computer but gives the wrong error.
+It can fail silently. This seems like an abrogation of a compiler's
+contract with its faithful coder, but it isn't. That compiler
+ensured that the code ran well enough on one target architecture.
+The problem is that compiler optimizations at level \textsc{o3}, and above,
+are willing to make slightly riskier choices that yield great
+performance benefits. These choices are tuned to the architecture
+at hand, or as requested by compiler options, and, while they may
+run on similar architectures, carry more risk of error on them.
+It solves the problem of having languages
+that don't clearly represent time-saving invariants and of coders
+who can't afford motorcycles.
+
+There's a solution for this, too. Turn all optimizations down
+to \textsc{o2} or lower. Or claim to the compiler that the \cpu
+understands no later than the \textsc{sse2} instruction set from 2000.
+Unless you're intentionally commemorating the year Phil Katz died, you'll see
+this as a severe loss of performance.
+
+The last option to deal with this problem is called checkout,
+which is ``testing conducted in the environment to ensure that a software product performs as required after installation. (IEEE 829-2008)'' It means that you create a test to run before you
+run code on a new machine. It won't do the work of creating
+a separate version of the code, if needed, but it tells you if
+you need it. You don't generally care about integer performance
+here. You care about vectorized code and floating-point code.
+That's where the problems will be, so you can subset the test
+suite for these acceptance tests.
+
+Designating a subset of all tests as acceptance tests is an
+example of test case prioritization~\cite{rothermel1999test}.
+We prioritize tests by hand, by marking tests to be run under
+different conditions, but tests for scientific code can be lengthy,
+which makes it worth considering automatically reordering tests
+so that those that are most sensitive to correctness run by 
+themselves, or run first~\cite{yoo2012regression}.
+
+\section{Testing traits of a function}
+
+\subsection{Using symmetry to test a function}\label{sec:symmetry-test}
+
+Sometimes knowing the math of a software function lets you
+test the software, even when you have an oracle problem.
+\emph{Metamorphic testing} uses the symmetry of the math function
+in order to test the correctness of the software function~\citep{ding2016,guderlei2007,kanewala2015,liu2014}.
+
+The mathematical description of a function is that it relates
+a domain (input) to a range (output). We write $f(x) = y$.
+If the function is an exponential, then $e^{-x} = 1 / e^x$,
+so $f(-x) = 1 / f(x)$. We may not know what the value of
+$e^{2.4}$ is, but we do know it has to match $1 / e^{-2.4}$.
+
+Here's a longer example. Given a mortality rate, $m$, the
+mean age of death over an age interval, $n$, is
+\begin{equation}
+    a = \frac{n - n(1+m n)e^{-m n}}{1 - e^{-m n}}.
+\end{equation}
+If we notice that this equation can be written
+\begin{equation}
+    a = f(m, n) = n  f_1(m  n),
+\end{equation}
+then we can design an interesting test.
+\begin{eqnarray}
+    \frac{a}{n} &= &f_1(m  n) \\
+    \frac{a/2}{n/2} &= & f_1((2  m)  (n / 2)) \\
+    a /2 &= & (n/2) f_1((2  m)  (n / 2)) \\
+    a &= &2 * f(2m, n/2) \\
+    f(m, n) & =& 2 * f(2m, n/2)
+\end{eqnarray}
+This result isn't true for almost all functions. It's a strong test
+of the implementation. It's an example of the more general
+form of symmetry testing, which insists that some transformation
+of the inputs has a relationship with some transformation of the 
+outputs,
+\begin{equation}
+    f(g(x)) = h(f(x)),
+\end{equation}
+where $f$ is the function under test, and $g$ and $h$ are the transformations.
+
+\begin{lstlisting}[language=R]
+mean_age_of_death <- function(m, n) {
+  (n - n * (1 + m * n) * exp(-m * n)) / (1 - exp(-m * n))
+}
+test_that("dividing by a constant multiplies by a constant", {
+  m1 <- 0.01
+  n1 <- 1.0
+  a1 <- mean_age_of_death(m1, n1)
+  for (k in seq(0.1, 5, 0.3)) {
+    a2 <- mean_age_of_death(k * m1, n1 / k)
+    expect_lt(abs(2 * a2 - a1), 1e-7)
+  }
+})
+\end{lstlisting}
+
+Metamorphic testing is an assertion about a symmetry relationship between
+the domain and range of a function. Because it's an invariant at the top-level
+of the function, it has an opportunity to find simple faults in algebra,
+grouping of terms, or off-by-one errors. It also has an opportunity to
+find faults that result from denormalization or loss of significant digits
+in floating-point math.
+
+
+
+\section{Statistics for Testing}\label{sec:statistical}
+
+\subsection{Randomized calculations should give different answers each time}
+
+A simple Gaussian elimination can benefit from random pivoting.
+A function to sample a distribution is supposed to return a new value
+every time it's called.
+Some functions introduce random reorderings
+so they can insist that the caller not expect a given order
+in the output. All of these perfectly useful functions
+thwart using simple lookup tables to test their output.
+
+The tests, themselves, can be the problem when we randomly
+generate test cases. I'll check
+a life expectancy function against a corpus of life expectancies
+for every country. I'll randomly generate user input
+to see that a functions succeeds or gracefully fails.
+
+When testing these random functions,
+we have on our side some basic tools
+of statistics. Some, like mean square error, are ways
+to heap our uncertainty into a single, tidy number.
+Others are formal statistical
+tests. They take a clear side-effect of a function,
+its randomness, and tame it to measurable uncertainty.
+Let's look at just a few examples.
+
+\subsection{Approaches}
+
+\subsubsection{Error estimation}
+When the function under test returns a vector of values,
+and I want to compare it with a vector of known values,
+I use an estimator, like mean-squared error, of the difference
+between the two.
+
+The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
+It takes the whole set of values and reduces it to one number I can assert must be less than some value.
+
+When values range from small to large, it's convenient to use
+relative error instead of absolute error.
+\begin{equation}
+  \mbox{relerr} = \frac{\hat{Y}_i - Y_i}{Y_i}
+\end{equation}
+The known value is always in the denominator.
+
+Even more reassuring for a unit test, I can take all of the
+sets of values and take the maximum absolute error,
+$\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
+some boundary value whose crazy-high error is hidden beneath
+low error everywhere else.
+
+\subsubsection{Variance, standard deviation}
+When there is just one vector of random numbers coming out
+of a function, it can be helpful to characterize how far
+they are from their average value. The variance is
+the average of how far each value is from the average of all
+values,
+\begin{equation}
+  \mbox{var}(Y) = \frac{1}{N}\sum_i (Y_i - \bar{Y})^2,
+\end{equation}
+but you'd use the always-avaiable
+as \lstinline!var! or \lstinline!variance! in any language.
+The standard deviation is the square root of variance.
+
+If variance is zero, then every value in the vector is
+the same. There are some functions, such as the Cauchy
+distribution, that don't have a variance. For such a function,
+the value of the variance will keep increasing as the
+number of draws of the function increases, instead of
+converging to a single value. This, in itself, is a
+testable property of a function.
+
+
+\subsubsection{Confidence interval}
+
+Assume there is a function with randomness, that produces floating-point numbers. Those results
+have some average value, but they vary around that average value.
+If we run this function a thousand times and take the
+lower value, below which 2.5\,\% of the results fall,
+and the upper value, above which 2.5\,\% of the results fall,
+then this interval is the 95\,\% standard deviation.
+
+For research statistics, the standard deviation is often part
+of an argument that a model of a problem is appropriate to
+the observed data. For unit testing the standard deviation
+is a rule of thumb for how often a perfectly good unit test
+will randomly fail. If you want it to fail five percent of
+the time, use a 95\,\% interval. If you want it to fail
+one time in a thousand, use a 99.9\,\% interval.
+
+Given that results from a function are random, and we
+want to make some cutoff on which results are acceptable,
+we want to choose a cutoff that is informative, so it's
+close to the average good value. On the other hand, we don't
+want it to fail a lot. The standard deviation tells us
+how much push luck in either direction.
+
+\subsubsection{Pearson coefficient}
+Let's say the output of a function is a set of $y$ values,
+and the input is a set of $x$ values. You may not know
+how $y$ depends on $x$ exactly, but you know that it
+does. The Pearson coefficient is a function of
+$N$ $y$ values and $N$ $x$ values that will return a number
+between -1 and 1, where -1 is a line with a downward slope,
+1 is a line with an upward slope, and 0 means the points
+are evenly arranged so that they don't slope up or down
+and aren't collinear.
+
+For a single $y$ that depends on a single $x$, the equation
+is a few lines of code.
+\begin{equation}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
+\end{equation}
+It conveniently generalizes to more dimensions.
+
+The Pearson coefficient is a handy, if imprecise,
+set of guard rails on the behavior of a function.
+It quickly determines whether the output rises or falls with the input,
+even in the presence of noise. It can say whether the output
+isn't linear enough, or whether it's too linear.
+It even has a multidimensional generalization for data that
+has multiple $x$ and $y$ values.
+
+
+\subsection{Taming randomness}
+
+I make tests with random inputs, so they explore more alternative
+paths in the code than I might guess. I run tests of random
+functions a thousand times so that they have more chances to
+show a real bug. Randomness in testing is a free source for
+finding faults, and it's a constant headache.
+
+In order to use the statistical tests above, I need to choose
+a cutoff on what is a passing test and what is a failing test.
+If I choose a cutoff that's useful for finding faults, it will
+always fail for some percentage of tests. For a 95\,\% confidence
+interval, it will fail 5\,\% of the time. Even for a
+99.9\,\% confidence interval, it will fail once in a thousand
+tries. This means the green lights of a unit test display will
+be red without reason once in a thousand times, but that's
+enough not to pay attention to a red light. It's a lure to
+rerun the test suite every time there is any red light.
+It's a waste of attention.
+
+The solution is simple. Fix the seed for the random number
+generator for each test that has randomness. The random
+seed determines the exact set of random values that will
+follow. If the test passes for a particular random seed,
+then it will always pass for reruns of the unit test until
+some fault is introduced.
+
+The simple solution is sometimes impossible and always
+disappointing. Most programming languages offer the tremendous
+convenience of calling \lstinline!rand()! anywhere in the
+code, which uses a global random number generator. Sometimes
+\rlang code calls \lstinline!rand()! and then calls \cpp code
+that calls \lstinline!rand()! from a different random number
+generator. Authors
+of code unfortunately use this convenience, creating side-effects
+for testing. Only sometimes can we make a repeatable
+stream of random numbers by declaring a specific random number generator
+and passing it to a function.
+
+(It's also possible to greatly reduce the rate of failure
+for a statistical test, even with the same 99\,\% cutoff
+on acceptable results, if we take the same hundred tests
+and use the statistical framework to treat them as ten sets
+of ten tests.)
+
+Let's say we can fix the seed for a function, and for all the
+functions it calls. The joy of randomized testing is that more
+runs might yield more faults in the code. We
+can still do lots of runs by creating a unit test that is run once
+for a set of seeds.  The procedure is to define a starting seed and run against
+the next thousand seeds. When the test shows no real faults,
+choose a starting seed for which the next thousand all pass
+the test within some tolerance. This is less simple, but it
+explores the space of tests and is likely to signal when
+a real fault arrives.
+
+\subsection{Conclusion}
+
+Some kinds of unit tests are absolute. When they pass,
+there is no fault in this one path through the function.
+Statistical tests don't give that guarantee. The function
+under test could be close-enough to the desired value but
+still have a fault in some code path.
+At the same time, statistical tests can find faults
+in places you weren't looking, because they summarize all
+of the outputs of a function or because they summarize
+the behavior of multiple runs of a function.
+
+If we were testing a typical function, for which we knew the
+right answer, that unit test would offer the meager assurance that,
+for one set of parameters, the function is correct.
+Statistical tests, like those above and many more statistical
+tests not mentioned, can assert that, for one set of parameters,
+a function isn't too wrong.
+
+
+
 
 \section{Testing parameter logic}\label{sec:parameter-logic}
-\subsection{Introduction}\label{sec:parameter-introduction}
-If we need to implement some matrix algorithm, then
-we might make a function that has a few arguments: the matrix of data, algorithm parameters
-to control cutoffs in the algorithm, and options to determine whether
-the result is written back into the source matrix memory.
-The data, algorithm parameters, and options are all, in the eyes of unit testing,
-parameters.
-
-These three kinds of parameters, however, tend to affect functions
-differently. Options appear in the test of if--thens, so they change
-the code path. The code path is the sequence of blocks of code that execute
-for a particular set of parameters.
-Algorithm parameters tend to appear in key equations, so that they
-affect data flow in a function. The data flow is a graph
-of which values in a function depend on which previous values.
-The input matrix, itself, is effectively a two-dimensional matrix of
-parameters, greatly increasing the number of possible inputs to a function.
-
 
 \subsection{Decision Tables}\label{sec:parameter-decision}
 
@@ -1082,7 +1302,7 @@ Whichever method you choose, it's
 good to have one of these methods available when it's time to
 do user-level testing on scientific code.
 \citet{petke2015practical} cover these strategies in their book,
-and there are a few survey papers on the topic~\citep{nie2011survey,khalsa2014orchestrated}.
+and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
 
 
 \subsection{Example}\label{sec:parameter-wilson}
@@ -1193,49 +1413,6 @@ Think of parameter-handling as translation from an external
      consistent, concise for internal processing.
 
 
-\section{Mutation testing}\label{sec:random-changes}
-The function under test, as with any block of code, can be
-represented as a syntax tree. This tree of operators, operands,
-and assignments, represents a contract with the compiler,
-represents the flow of information from parameters to output,
-represents a treasure map of potential faults. There is a form
-of testing that reads the function under test, creates its
-syntax tree, and randomly mutates it. At random, it adds a one to the
-limit of a loop, and runs the unit tests again. It changes
-the order of assigment statements and tests again. Each time
-it records the change to the tree, and the outcome of the tests.
-
-When the test suite is mature, then there should be some test
-that fails for each mutation, but that isn't the case. A
-large percent of genetic mutations of the code that
-cause no test to fail, and most of those won't indicate the
-code has a fault, or even that tests are incomplete. Instead,
-these cases force a question about what choices in the code
-matter and what is irrelevant.
-
-We discussed in Sec.~\ref{sec:parameter-introduction} that
-we can understand a function by parsing it as a code path
-or as a data flow. Each random mutation to the code will
-have an effect that traces backwards to the input parameters
-or forwards to the result, through code paths and data flows.
-When a mutation has no effect on tests and isn't a fault,
-it highlights the conditionals that it affects later in the function
-and the values it affects later in the function.
-
-What we discover, when we look at those conditionals and
-values, is that mutations won't be faults when they don't
-break invariants in the code that are enforced by more than
-one mechanism. For instance, they may set a value that is
-later overwritten, not read. They may change the length
-of an array, but later for-loops iterate only over a smaller
-portion of the array.
-
-It's normal for a function to accidentally doubly-enforce
-the invariants it needs to be true. It's normal for this testing
-technique to tell you, once for each of thousands of iterations,
-that either your test coverage is incomplete or that
-code will sometimes work fine after your cat walks across
-the keyboard.
 
 
 \section{Testing data movement}\label{sec:data-movement}
@@ -1409,142 +1586,6 @@ each of the 576 kinds of inputs.
 
 
 
-\section{Using symmetry to test a function}\label{sec:symmetry-test}
-
-Sometimes knowing the math of a software function lets you
-test the software, even when you have an oracle problem.
-\emph{Metamorphic testing} uses the symmetry of the math function
-in order to test the correctness of the software function~\citep{ding2016,guderlei2007,kanewala2015,liu2014}.
-
-The mathematical description of a function is that it relates
-a domain (input) to a range (output). We write $f(x) = y$.
-If the function is an exponential, then $e^{-x} = 1 / e^x$,
-so $f(-x) = 1 / f(x)$. We may not know what the value of
-$e^{2.4}$ is, but we do know it has to match $1 / e^{-2.4}$.
-
-Here's a longer example. Given a mortality rate, $m$, the
-mean age of death over an age interval, $n$, is
-\begin{equation}
-    a = \frac{n - n(1+m n)e^{-m n}}{1 - e^{-m n}}.
-\end{equation}
-If we notice that this equation can be written
-\begin{equation}
-    a = f(m, n) = n  f_1(m  n),
-\end{equation}
-then we can design an interesting test.
-\begin{eqnarray}
-    \frac{a}{n} &= &f_1(m  n) \\
-    \frac{a/2}{n/2} &= & f_1((2  m)  (n / 2)) \\
-    a /2 &= & (n/2) f_1((2  m)  (n / 2)) \\
-    a &= &2 * f(2m, n/2) \\
-    f(m, n) & =& 2 * f(2m, n/2)
-\end{eqnarray}
-This result isn't true for almost all functions. It's a strong test
-of the implementation. It's an example of the more general
-form of symmetry testing, which insists that some transformation
-of the inputs has a relationship with some transformation of the 
-outputs,
-\begin{equation}
-    f(g(x)) = h(f(x)),
-\end{equation}
-where $f$ is the function under test, and $g$ and $h$ are the transformations.
-
-\begin{lstlisting}[language=R]
-mean_age_of_death <- function(m, n) {
-  (n - n * (1 + m * n) * exp(-m * n)) / (1 - exp(-m * n))
-}
-test_that("dividing by a constant multiplies by a constant", {
-  m1 <- 0.01
-  n1 <- 1.0
-  a1 <- mean_age_of_death(m1, n1)
-  for (k in seq(0.1, 5, 0.3)) {
-    a2 <- mean_age_of_death(k * m1, n1 / k)
-    expect_lt(abs(2 * a2 - a1), 1e-7)
-  }
-})
-\end{lstlisting}
-
-Metamorphic testing is an assertion about a symmetry relationship between
-the domain and range of a function. Because it's an invariant at the top-level
-of the function, it has an opportunity to find simple faults in algebra,
-grouping of terms, or off-by-one errors. It also has an opportunity to
-find faults that result from denormalization or loss of significant digits
-in floating-point math.
-
-
-\begin{callout}
-\textbf{Mathematical Complexity}---Has your code editor ever told you,
-"Computational complexity 16, project limit is 15. Please refactor?"
-\emph{Computational complexity} looks at every if--then--else and counts the
-number of possible paths through a function.
-Scientific code has high \emph{mathematical complexity,\/} which is a
-count of the number of mathematical operators and function calls in
-a function. Would you want your linter to insist on low mathematical complexity in
-a function?
-\end{callout}
-
-
-\section{Testing the compiler}\label{sec:test-compiler}
-
-Let's say you have a cluster of computers. They are all Intel machines,
-but they come from different years. They could be different architectures
-or just different steppings of the \cpu, which is the least difference
-one can have between two chipsets. You compile code on one machine,
-or you install some \rlang package that compiles code underneath. When
-you move to another computer on another day, that same code fails
-to run with the message, ``invalid opcode.''
-
-An opcode is a machine-language instruction. The computer you used
-yesterday knew a command that's slightly too fancy for the computer
-you're using today, and it failed. You have to clean out the code
-and recompile today. It's not that the new computer is just older.
-It's still possible that, were you to switch back, there might be
-the same message again. The history of \cpu opcodes isn't a forward
-march into a larger, better set.
-
-That scenario would be annoying, and it's a headache for people
-saddled with heterogenous clusters. They solve it with, for instance,
-creating architecture-specific shared drives so that they can
-install a different version of the software for each version of
-system architecture on the cluster. That scenario is, however, a
-best case scenario.
-
-The worse scenario, and I wish this were rarer, is that the
-software runs on the other computer but gives the wrong error.
-It can fail silently. This seems like an abrogation of a compiler's
-contract with its faithful coder, but it isn't. That compiler
-ensured that the code ran well enough on one target architecture.
-The problem is that compiler optimizations at level \textsc{o3}, and above,
-are willing to make slightly riskier choices that yield great
-performance benefits. These choices are tuned to the architecture
-at hand, or as requested by compiler options, and, while they may
-run on similar architectures, carry more risk of error on them.
-It solves the problem of having languages
-that don't clearly represent time-saving invariants and of coders
-who can't afford motorcycles.
-
-There's a solution for this, too. Turn all optimizations down
-to \textsc{o2} or lower. Or claim to the compiler that the \cpu
-understands no later than the \textsc{sse2} instruction set from 2000.
-Unless you're intentionally commemorating the year Phil Katz died, you'll see
-this as a severe loss of performance.
-
-The last option to deal with this problem is called checkout,
-which is ``testing conducted in the environment to ensure that a software product performs as required after installation. (IEEE 829-2008)'' It means that you create a test to run before you
-run code on a new machine. It won't do the work of creating
-a separate version of the code, if needed, but it tells you if
-you need it. You don't generally care about integer performance
-here. You care about vectorized code and floating-point code.
-That's where the problems will be, so you can subset the test
-suite for these acceptance tests.
-
-Designating a subset of all tests as acceptance tests is an
-example of test case prioritization~\cite{rothermel1999test}.
-We prioritize tests by hand, by marking tests to be run under
-different conditions, but tests for scientific code can be lengthy,
-which makes it worth considering automatically reordering tests
-so that those that are most sensitive to correctness run by 
-themselves, or run first~\cite{yoo2012regression}.
 
 
 \section{Outside the code}\label{sec:outside-code}
