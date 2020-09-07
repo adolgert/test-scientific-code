@@ -1,0 +1,105 @@
+
+
+- Introduction
+
+  This is about tenuous translation.
+
+
+- Reading code for risk
+
+  * Fault vs failure
+
+    Fault is what you typed, failure is what resulted.
+
+  * Risks of floating-point
+
+    o Representation
+
+    o Equality
+
+    o Numerical analysis
+
+  * Code paths and code data flows
+
+    This is how to parse a function, visually and algorithmically.
+
+  * Parameters in scientific code... the size of the problem
+
+    These parameters change where we look for errors.
+
+    o Integer parameters for counting
+
+    o Floating point parameters
+
+    o Vector parameters
+
+    o Larger data structures
+
+  * Mathematical complexity versus computational complexity
+
+    The equations and if--thens depending on numbers bring different risk.
+
+  * Errors in translation from math to code
+
+
+- Parallel Implementation
+
+  * Introduction
+
+  * Decision table
+
+    o Structure of the table
+
+    o Particular parameter values as a parallel implementation
+
+  * Rewriting from earlier in the process
+
+  * Another language or library
+
+  * A figure in a paper
+
+  * Regression tests
+
+  * Create-read-update-delete lists
+
+
+ - Testing traits from multiple runs
+
+  * Continuity
+
+  * Limits
+
+  * Symmetry of the function
+
+  * Error estimation
+
+  * Statistical tests
+
+
+- What to test
+
+  * High-level, low-level
+
+    o Fault-finding
+
+    o 
+
+  * Test case generation
+
+    o Introduction
+
+      - Size of the domain of parameters
+
+      - Allowed / feasible inputs
+
+      - Probability of inputs
+
+      - Testing goals affect test choice
+
+    o Partition testing with equivalence classes
+
+    o Random
+
+    o Symbolic (Pex, IntelliTest)
+  
+  * Agreed-upon tests... the team

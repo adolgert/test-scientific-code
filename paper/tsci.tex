@@ -67,10 +67,39 @@ code. Some techniques are adaptations of traditional unit testing methods
 and others are particular to testing scientific code.
 \end{abstract}
 
+% Audience:
+% a) researchers who write code but don't know how to turn notebooks
+%    into unit tests.
+% b) software engineers who implement code but aren't sure how to handle
+%    tests of squirrelly math.
+
 % From Mike Richards
-% 1. When you make parallel implementations, start with the dead-simple slowest.
 % 2. Focus on moving up and down the stack, not between scientist and developer.
 % You don't need to tell them everything about the subject.
+% Alec contributed Pearson
+% James presses about the audience and software vs. math.
+
+% TODO
+% This is limited to functional testing, not performance or other.
+% Missing: fault localization, model-based testing
+% Read random testing paper.
+% add simple stats tests from the intro modern stats book
+% add truth about domain clash between software and math.
+% add figures to explain pearson coefficient
+% explain mantiss and exponent.
+% focus floating point on what they need to know, not an exceptions list.
+% learn more on acceptance testing.
+% add more symmetry examples.
+% Read more recent mutation test papers to be fair to it.
+% show path analysis and flow analysis as figures.
+% Add a 4.6 on testing against a fixed list of known good values.
+% Take a failing test and reduce the input until you have
+% a smallest failing test. Very helpful for identifying failures.
+
+% High level tests will test more.
+%                  will make it harder to find a fault.
+%                  will make it harder to identify a _failure._
+
 
 \flushbottom
 \maketitle
@@ -98,6 +127,28 @@ always have behavior we can discover, characterize, and assert in a unit
 test. Some of that behavior is approximate, that the result be near a
 value. Some is exact, in a limit or at a boundary.
 
+It's this mathematical behavior that is our first concern for testing.
+It's called functional testing, when we look for faults in the code
+that would lead to failures when the code runs. We can exclude, here,
+questions of testing how long a function runs, how much memory it uses,
+whether it's secure, or whether it's usable.
+
+Even with this scope, of whether the function will, in the future,
+give the right answer, it will become clear, that, as complex as
+code looks on a monitor, the work to reassure ourselves that it lacks
+faults, that there is no character out of place, would be terribly more
+work than to write the function. If each part of a scientific application
+had an exhaustive suite of tests, it would become brittle to change,
+the opposite of a tool for research.
+
+The code we test has a topography of risk. Some of it is measurable,
+as a number of if--then statements or a count of equation terms.
+Some of it is a landscape of doubt, that these lines of code are
+doing their job or that that language idiom is properly-written.
+When a function fails to read a file, and it quits, that's less
+a problem than a function that reads a file incorrectly and gives
+a wrong result.
+
 Assuming we've read a good unit testing book like \cite{jorgensen2013},
 and that we can figure out, elsewhere, the construction of unit tests
 in code, let's assess here the risks that are unigue to scientific code.
@@ -120,7 +171,7 @@ One part of it is simple, that almost every language follows the
 \ieee~754 standard.
 A little book called \emph{Numerical computing with IEEE floating point arithmetic}
 describes both the \ieee~754 standard
-and some common implications for how you write equations in code~\citep{overton2001numerical}.
+and some common implications for how you write equations in code~\citep{overton2001numerical,goldberg1991every}.
 The complicated part is that the application, compiler,
 and even operating system act as filters to decide whether the same division
 by zero will raise an exception, return infinity, or silently return not-a-number (\nan).
@@ -145,7 +196,7 @@ language-level exception.
     in plus or minus zero, or the smallest representable number,
     or a special value called a subnormal.
     \item \emph{Inexact}---The result can't be represented exactly
-    with the \ieee standard. Yes, this almost always happens.
+    with the \ieee standard. For example, 2.0 / 3.0. This happens a lot.
 \end{itemize}
 In some cases, these floating point exceptions will result in termination
 of a program. In other cases, the result is silently replaced
@@ -165,7 +216,7 @@ For instance, if a Python Pandas data frame returns a \nan when it
 takes a square root of a negative number, and my code relies that behavior,
 then I make a test that runs negative data through the code.
 \begin{lstlisting}[language=Python]
-def test_f():
+def test_sqrt_negative_is_nan():
     df = pd.DataFrame({"a": [3.0, -3.0]})
     df.b = np.sqrt(df.a)
     assert(np.isnan(df.b[1]))
@@ -213,7 +264,7 @@ Machine epsilon is the smallest difference in the mantissa,
 excluding the exponent, so if you want to test that two
 floating point numbers are equal, you test relative error using
 machine epsilon.
-\begin{lstlisting}[language=R]
+\begin{lstlisting}
 n <- 4
 same <- x * (1 + n * machine_epsilon) > y && x * (1 - n * machine_epsilon) < y
 \end{lstlisting}
@@ -408,7 +459,7 @@ and aren't collinear.
 For a single $y$ that depends on a single $x$, the equation
 is a few lines of code.
 \begin{equation}
-r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})}}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
 \end{equation}
 It conveniently generalizes to more dimensions.
 
@@ -506,10 +557,17 @@ something known about the answer. Every unit test is two
 functions, the function under test and a parable
 of that function, written into the unit test itself.
 
-There are times that it's reasonable to write a test version
-of a function, some second, similar way. In fact, we most often write
-a function first using its most obvious, probably slowest, algorithm.
-The obvious algorithm is an excellent unit test on any refinement.
+Often, we're given code that has some functions that do important
+work but have too little documentation and no tests. It's easy
+to add tests, in this situation, in order to understand what
+those functions do. The tests can then tell the story of how
+to set up data for those functions and work with their output.
+
+An easy form of parallel implementation is the previous version
+of a function. Given the task to write code, the programmer will
+start with the simplest version that does the task, and then they
+iterate to make it better. That simplest version makes an excellent
+parallel implementation for use case testing.
 
 We can find an appropriate parallel implementation for testing by
 looking at the set of choices we make when writing the original function
@@ -525,7 +583,7 @@ scientific software, and we'll add one step before theirs.
 \end{enumerate}
 If only the algorithm in the code changes, then the results
 should be quite similar. If the models are discretized differently,
-then it takes more care to use one for testing of the other.
+then it takes more analysis to use one for testing of the other.
 Which you choose depends on the kinds of faults you think pose
 the most risk in the code.
 
@@ -698,7 +756,7 @@ result from that function. The parallel implementation, in this case,
 is the previous version of the same function.
 
 There is a book called \emph{Release It!} that says we should
-``make regression testing easy,''~\cite{nygard2018release}. It's hard to make it easy
+``make regression testing easy,''~\citep{nygard2018release}. It's hard to make it easy
 because unit tests are built to test, not save output. Even if
 they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
@@ -749,6 +807,11 @@ missing values, zero values, or unusually sharp rises or falls in
 mortality rate. Sets of parameters that probe the same faults in
 the function under test are called \emph{equivalent.}
 
+% This is called Partition testing
+% You split by functionality, specification, requirements,
+% or you split by statement coverage, code coverage, branch coverage.
+% 
+% If everything in a partition fails, it is "homogeneous."
 Methods to test parameter logic all have the same underpinning,
 that they will try to test at least one set of parameters from
 each of the equivalence classes of inputs. Deciding what is an
@@ -827,7 +890,7 @@ number of tests above would be $60\times 6 = 360$.
 
 \subsection{Limiting values of parameters}\label{sec:limits}
 
-Not every parallel implementation is an brute-force retelling
+Not every parallel implementation is a brute-force retelling
 of a model. Most mathematical functions provide finger-holds
 support of their correctness.
 
@@ -905,17 +968,43 @@ address risks in the code most efficiently.
 
 
 \subsubsection{Random parameter choices}
-Given a set of possible equivalence classes for each parameter, use a random
-number generator to choose one of each. Do this as many times
-as runtime allows. When using this method, it's critical to
-report not only failing tests but also the exact set of parameters
-that made the tests fail.
 
-Randomized test cases are easy to implement, and they can
-supplant the author's duty to identify the greatest risks
-in the code. The main drawback is time to run this kind of
-test, especially because it's tempting to play the lottery
-by letting it keep running.
+The hardest part of generating test cases is choosing parameters
+that will find the most failures in the shortest time. Equivalence
+classes tell you which parameters will find the same failures,
+so they tell you which tests would be redundant. Given a set
+of tests, it's better to throw out those that are redundant,
+but the work to generate tests that aren't redundant can be cumbersome.
+The work to establish equivalence classes requires care,
+and sometimes parameters that seem equivalent might generate
+different failures.
+
+Randomized parameter generation avoids these problems. It's easier
+to generate parameters from a range or a set and to mix and match
+them at random. The tests might run longer to find a failure, but
+the tests are much faster to write, and you always know that longer
+runs have a better chance to find a failure. Every time you
+run twice as many tests, you increase the possibility of finding
+tests by fifty-percent. That's one kind of well-behaved.
+
+This doesn't mean the inputs have to be entirely random. For
+instance, if an input is a vector of numbers, it makes sense
+to randomly draw a length for the vector and then randomly
+draw each of the numbers, because using a random bit pattern
+would mean almost all vectors are near the maximum length.
+A vector that's created with a length draw is still random,
+but it's biased towards shorter vectors, because these tend
+to find faults in algorithms.
+Random parameters choices can be biased to choose more often
+those parameter sets that are more commonly used. They can
+be biased towards edge cases that might find failures. Either way,
+they are usually random with probability weights.
+
+Because random parameter generation is straightforward
+and predictable, it is very common and highly effective~\citep{arcuri2011random}.
+It makes most sense when unit tests don't take long to run
+and when it is possible to assign a known true answer, or trait
+of an answer, for all possible inputs.
 
 
 \subsubsection{Combinatorial excursions}
@@ -1440,8 +1529,8 @@ understands no later than the \textsc{sse2} instruction set from 2000.
 Unless you're intentionally commemorating the year Phil Katz died, you'll see
 this as a severe loss of performance.
 
-The last option to deal with this problem is called acceptance
-testing. It means that you create a test to run before you
+The last option to deal with this problem is called checkout,
+which is ``testing conducted in the environment to ensure that a software product performs as required after installation. (IEEE 829-2008)'' It means that you create a test to run before you
 run code on a new machine. It won't do the work of creating
 a separate version of the code, if needed, but it tells you if
 you need it. You don't generally care about integer performance
