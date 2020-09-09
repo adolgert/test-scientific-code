@@ -109,8 +109,8 @@ and others are particular to testing scientific code.
 \section{Introduction}\label{sec:introduction}
 
 \begin{itemize}
-    \item Set scope: functional, the right answer.
-    \item Not performance, security, usability.
+    \item Set scope: functional, the right answer, not performance, security, usability.
+    \item Why this? If you want to understand how a thing works, study how it breaks.
 \end{itemize}
 
 The code for a scientific application, laid out across a monitor,
@@ -191,8 +191,8 @@ close, but not close-enough.
 
 Failures come from defects in the code, which we call \emph{faults,}
 and we classify these so that we know which are most important
-to our task (ODC).
-
+to our task. The ODC classifies types of defects, in order to understand
+how different types affect code across its development time.
 \begin{itemize}
     \item \emph{Algorithm}---These are correctness problems
     that can be fixed within a function or local data structure.
@@ -203,23 +203,59 @@ to our task (ODC).
     of control blocks or data structures.
 
     \item \emph{Checking}---Program logic around loop conditions
-    and branching statements. A mistaken condition can mean that
+    and branching statements. This is about a wrong if--then. A mistaken condition can mean that
     the result would be correct for a different set of parameters.
 
     \item \emph{Interface}---Defects when calling other components
     or functions. This includes parameter lists.
 
-    \item \emph{Input/Output}---Faults when reading and writing
-    data from/to any other component.
+    \item \emph{Functional}---This doesn't mean that defects are
+    in functions. It means these are errors that require redesign
+    of the code. It can mean moving code among functions, changing
+    important data structures, or redesigning objects.
 
     \item \emph{Documentation}---Whether it's published documentation,
     code documentation, or maintenance notes, there can be
     correctness errors here.
 \end{itemize}
+While algorithm defects are immediate threats to correctness, the
+ODC paper found tended to find them early in development and testing, and
+tests in assignment and checking are no less harmful. That means
+we get the core algorithm correct early and shoot ourselves in
+the foot as we add options to the code.
 
-While algorithm defects are immediate threats to correctness, we
-tend to find them early in development and testing, and
-tests in assignment and checking are no less harmful.
+There's another classification scheme for faults that asks
+\emph{where} they happen, in what part of the code. For scientific computing,
+we can break that down into a few pieces.
+\begin{itemize}
+    \item \emph{Input/Output}---Faults when reading and writing
+    data from/to any other component.
+
+    \item \emph{Algorithm}---Faults in what we consider the main
+    computation. We tend to write code that centers on one
+    or more algorithms.
+
+    \item \emph{Code movement}---The work to move data from input
+    to the right data structure for an optimized algorithm. The work
+    to take data out of one data structure and put it into another one.
+
+    \item \emph{Parameter handling}---Faults interpreting input parameters.
+    There is often an early step to turn the parameters a user specifies
+    into an internal form that the algorithms need.
+
+    \item \emph{Visualization}---This is any output for the user. It
+    can be in a window or graphs on disk. We separate this from the
+    data input and output because it often has its own set of
+    algorithms which can be as complicated as any other part of the code.
+\end{itemize}
+These different parts of the code tend to have different maturity levels
+and different kinds of risks. They develop differently over time.
+For instance, visualization algorithms can come pre-packaged, so that
+most of the work is setting up the data and checking that it is valid
+for the visualization method. For visualization, the failure may look
+like a divide-by-zero, but the fault is more often input data that
+is in error.
+
 
 We use unit tests to look for faults, but unit tests observe
 failures. We can test less, and test better, by understanding
