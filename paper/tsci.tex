@@ -108,11 +108,6 @@ and others are particular to testing scientific code.
 \tableofcontents
 \section{Introduction}\label{sec:introduction}
 
-\begin{itemize}
-    \item Set scope: functional, the right answer, not performance, security, usability.
-    \item Why this? If you want to understand how a thing works, study how it breaks.
-\end{itemize}
-
 The code for a scientific application, laid out across a monitor,
 will have plenty of functions that look like those of any other application.
 It will parse command-line flags, parse input files, and maybe even have
@@ -120,7 +115,7 @@ an event loop. Some portion, however, will look entirely different. It
 may be laden with long equations, or it may be integer manipulation or
 graphs, but the functions that do this work are complex, and they carry risk.
 
-Those scientific functions are as complicated as they have to be
+The complexity of those scientific functions is necessary
 in order to model some feature of the world. Their math, whether mundane
 or arcane, makes it difficult to use traditional unit tests to address
 the risk of failure in these functions. When a model is supposed to represent
@@ -129,17 +124,24 @@ like an existential assertion.
 
 However, scientific models, and the functions that comprise them,
 always have behavior we can discover, characterize, and assert in a unit
-test. Some of that behavior is approximate, that the result be near a
-value. Some is exact, in a limit or at a boundary.
-
+test. Some of that behavior is approximate and some exact.
 It's this mathematical behavior that is our first concern for testing.
 It's called functional testing, when we look for faults in the code
-that would lead to failures when the code runs. We can exclude, here,
+that would lead to failures when the code runs. We exclude, here,
 questions of testing how long a function runs, how much memory it uses,
 whether it's secure, or whether it's usable.
 
+I met a man, at dinner at a wedding, who told me he quit his
+job as \textsc{ceo} of a printer company in order to lead
+the support division. He said the company was going downhill,
+and there was no better way to find out why than to hear from
+the customer about how their product failed.
+For scientific code that supports research, it can be hard to
+know when it's right or wrong, and unit testing is the
+support division.
+
 Even with this scope, of whether the function will, in the future,
-give the right answer, it will become clear, that, as complex as
+give the right answer, it will become clear that, as complex as
 code looks on a monitor, the work to reassure ourselves that it lacks
 faults, that there is no character out of place, would be terribly more
 work than to write the function. If each part of a scientific application
@@ -155,14 +157,15 @@ a problem than a function that reads a file incorrectly and gives
 a wrong result.
 
 Assuming we've read a good unit testing book like \cite{jorgensen2013},
-and that we can figure out, elsewhere, the construction of unit tests
-in code, let's assess here the risks that are unigue to scientific code.
+and that we can figure out, elsewhere, the idiosyncracies of a
+particular language or testing framework,
+let's assess here the risks that are unigue to scientific code.
 Let's look at how the tools we already know can address those risks
 and how some new tools might help when the stakes are high.
 
 
 
-\section{What's a problem}
+\section{When a fault is a problem}
 
 Debugging code can take longer than writing it. You can see
 a wrong answer and spend hours trying to figure out where the
@@ -218,30 +221,49 @@ how different types affect code across its development time.
     code documentation, or maintenance notes, there can be
     correctness errors here.
 \end{itemize}
-While algorithm defects are immediate threats to correctness, the
-ODC paper found tended to find them early in development and testing, and
-tests in assignment and checking are no less harmful. That means
-we get the core algorithm correct early and shoot ourselves in
-the foot as we add options to the code.
+Scientific equations are in the algorithm category, so that category
+is the most immediate threat to correctness, but the
+ODC paper observed that teams find algorithm defects early in the
+development process. Meanwhile, faults in assignment and checking were
+found later in the development process. A fault in checking would
+mean an incorrect branch in the code. Even if the algorithm is
+correct, the answer from the code would be inappropriate, so these
+are no less wrong.
+
+I read a story in the observations of the ODC paper. It says
+that we first focus on the core math, and it has errors, but we
+gradually work those out. Meanwhile, we build software around that
+core math, and that software has features and options that multiply
+algorithmic complexity and thus multiply problems.
+
+Between these two kinds of errors, the algorithmic versus the
+checking and assignment, there is difference in how they fail.
+If an equation has a misplaced parenthesis or incorrect exponent,
+it is more likely to return a number without raising an exception.
+On the other hand, an off-by-one error in a loop, when it fails,
+is more likely to create an out-of-bounds memory error. This visible
+failure is a real problem in production code, but it is far
+less insidious than a silent fault in the equation.
 
 There's another classification scheme for faults that asks
-\emph{where} they happen, in what part of the code. For scientific computing,
-we can break that down into a few pieces.
+where they happen, in what part of the code. For scientific computing,
+we can use a traditional model of high-performance computing
+to break the \emph{where} into a few pieces.
 \begin{itemize}
+    \item \emph{Parameter handling}---Faults interpreting input parameters.
+    There is often an early step to turn the parameters a user specifies
+    into an internal form that the algorithms need.
+
     \item \emph{Input/Output}---Faults when reading and writing
     data from/to any other component.
-
-    \item \emph{Algorithm}---Faults in what we consider the main
-    computation. We tend to write code that centers on one
-    or more algorithms.
 
     \item \emph{Code movement}---The work to move data from input
     to the right data structure for an optimized algorithm. The work
     to take data out of one data structure and put it into another one.
 
-    \item \emph{Parameter handling}---Faults interpreting input parameters.
-    There is often an early step to turn the parameters a user specifies
-    into an internal form that the algorithms need.
+    \item \emph{Algorithm}---Faults in what we consider the main
+    computation. We tend to write code that centers on one
+    or more algorithms.
 
     \item \emph{Visualization}---This is any output for the user. It
     can be in a window or graphs on disk. We separate this from the
@@ -256,6 +278,15 @@ for the visualization method. For visualization, the failure may look
 like a divide-by-zero, but the fault is more often input data that
 is in error.
 
+Code movement tends to have checking- and assignment-type errors,
+while algorithm code tends to have, well, algorithm-type errors.
+This points to a principle for how to group code.
+\emph{Code Complete} gives seven types of cohesion that encourage
+grouping code together. We can add to that list. We should group
+code that needs similar kinds of unit testing because it poses
+similar kinds of risk. Here, that means we would do complete
+path testing on parameter handling. We might test random samples
+of data structures for code movement portions.
 
 We use unit tests to look for faults, but unit tests observe
 failures. We can test less, and test better, by understanding
@@ -265,7 +296,7 @@ how to read code so that we see cause and effect.
 \section{Path and data flow}
 
 We find problems in code by reading it, by testing it, or
-by running it. Both reading and testing rely on our ability
+by running it on real problems. Both reading and testing rely on our ability
 to see cause and effect in code.
 
 
