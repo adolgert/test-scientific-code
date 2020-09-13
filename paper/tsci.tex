@@ -324,15 +324,116 @@ it's called path analysis.
 Let's take a running average as an example. This code
 averages values over several days, and it will take an
 average of the last several days, the next several days,
-or in-between.
+or in-between. It's implemented without using \lstinline|numpy|,
+as an example. Look for control structures in this function.
 
-\begin{lstlisting}[language=Python]
+\begin{lstlisting}[language=Python,numbers=left]
 def running_average(x, duration, orientation, fill):
-    
+    offsets = {
+        "past": 1 - duration,
+        "future": 0,
+        "midpoint": 1 - ((duration + 1) // 2)
+        }
+    offset_in_window = offsets[orientation]
+
+    result = x[0:len(x)]
+    if fill:
+        filled = x[:1] * (duration - 1) + x + x[-1:] * (duration - 1)
+        offset_in_window += duration - 1
+        for i in range(0, len(x)):
+            a, b = [i + offset_in_window, i + duration + offset_in_window]
+            result[i] = sum(filled[a:b]) / duration
+    else:
+        for i in range(0, len(x)):
+            a, b = [i + offset_in_window, i + duration + offset_in_window]
+            left = max(a, 0)
+            right = min(b, len(x))
+            result[i] = sum(x[left:right]) / (right - left)
+    return result
 \end{lstlisting}
 
+If \lstinline|fill=True|, the lines 11--15 are run.
+If it's false, lines 17--21 are run. We can further subdivide
+these two blocks by observing that, if the length of \lstinline|x|
+is 0, then the for--loop won't run. Therefore, that's a separate
+block too. The blocks above are
+\begin{enumerate}
+    \item Lines 2--10, Set offsets
+    \item Lines 11-13, Create filled array
+    \item Lines 13--15, For--loop over filled array
+    \item Line 17, Without filling
+    \item Lines 17--21, For--loop over array
+    \item Line 22,
+\end{enumerate}
+
+There are four paths, which depend on \lstinline|fill|
+and \lstinline|len(x) > 0|.
+\begin{itemize}
+    \item 1, 2, 3, 6
+    \item 1, 2, 6
+    \item 1, 4, 5, 6
+    \item 1, 4, 6
+\end{itemize}
+This isn't the whole story, though.
+
+The four paths come from analyzing decisions in the code, which
+are if--then, for--loops, and while--loops. The code also has
+a branch point, where the code chooses which orientation to
+the window. Another example of a branch point would be selection
+from a data frame.
+\begin{lstlisting}
+under30 <- individuals_df[individuals_df$age < 30, ]
+\end{lstlisting}
+It isn't an if--then, but data above and below 30 will take
+different paths through the code.
+
+Path testing is a way to get a clear view of
+the code, but it's just one model for how to read code.
 
 \subsection{Data flow}
+Let's look at another piece of code, this one to integrate
+a differential equation.
+\begin{lstlisting}[numbers=left]
+function explicit_euler_riemann(mu, beta, p0, h, t0, t1, a0, a1)
+    a = a0:h:a1
+    t = t0:h:t1
+    m = length(a)
+    n = length(t)
+
+    u = zeros(h, m, n)
+    u[:, 1] = p0(a, t0)
+
+    for i in 1:(n - 1)
+        u[:, i + 1] = (1 .- h .* mu(a, t[i])) .* u[:, i]
+        u[1, i + 1] = h * sum(beta(a, t[i]) .* u[1:m, i])
+    end
+    u
+end
+\end{lstlisting}
+
+Pick an important assignment in the function, say line~11.
+Then trace backwards and forwards to see what affects this line
+and what this line affects. We can say \lstinline|u| depends
+on \lstinline|h|, \lstinline|a|, \lstinline|t|, and \lstinline|u|.
+We can trace back to line~8 that \lstinline|u| depends on
+\lstinline|a| and \lstinline|t0|. This dependency chain is a
+graph of cause-and-effect through the data in the function.
+
+For the code above, we could be more precise if
+we treat each column of \lstinline|u|
+as a separate piece of data. We say \lstinline|u[:, i+1]|
+depends on \lstinline|u[:, i]|, all the way back to 
+\lstinline|u[:, 1]| which depends on \lstinline|a| and
+\lstinline|t0|.
+
+If the output value, \lstinline|u|, has an error in row $k$,
+\lstinline|u[k, :]|, then we know from the data flow that
+this row doesn't interact with any other rows, until possibly
+setting the initial column, \lstinline|u[:, 1] = p0(a, t0)|.
+We see that an error in any row should propagate, on line~12,
+to the first row. If it doesn't, then it must be balanced out
+somehow. We can begin to reason about where the fault must
+be that caused the observed failure.
 
 
 \section{Testing numbers}\label{sec:ieee-numbers}

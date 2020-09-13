@@ -1,26 +1,21 @@
 def running_average(x, duration, orientation, fill):
-    def past(i, duration):
-        return [i - duration + 1, i + 1]
-    def future(i, duration):
-        return [i, i + duration]
-    def midpoint(i, duration):
-        return [i - duration // 2, i + duration // 2 + duration % 2]
-
-    orientations = {"past": past, "future": future, "midpoint": midpoint}
-    orient = orientations[orientation]
+    offsets = {
+        "past": 1 - duration,
+        "future": 0,
+        "midpoint": 1 - ((duration + 1) // 2)
+        }
+    offset_in_window = offsets[orientation]
 
     result = x[0:len(x)]
-    for i in range(0, len(x)):
-        a, b = orient(i, duration)
-        if fill:
-            y = x[0:duration]
-            left = -min(a, 0)
-            right = duration - (max(b, len(x)) - len(x))
-            y[left:right] = x[max(a, 0):min(b, len(x))]
-            y[0:left] = [y[left]] * (left - 0)
-            y[right:duration] = [y[right - 1]] * (duration - right)
-            result[i] = sum(y) / duration
-        else:
+    if fill:
+        filled = x[:1] * (duration - 1) + x + x[-1:] * (duration - 1)
+        offset_in_window += duration - 1
+        for i in range(0, len(x)):
+            a, b = [i + offset_in_window, i + duration + offset_in_window]
+            result[i] = sum(filled[a:b]) / duration
+    else:
+        for i in range(0, len(x)):
+            a, b = [i + offset_in_window, i + duration + offset_in_window]
             left = max(a, 0)
             right = min(b, len(x))
             result[i] = sum(x[left:right]) / (right - left)
@@ -68,70 +63,70 @@ def test_running_average_double_past():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "past", False)
     answer = [1, 1.5, 2.5, 3.5, 4.5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_double_future():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "future", False)
     answer = [1.5, 2.5, 3.5, 4.5, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_double_midpoint():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "midpoint", False)
     answer = [1.5, 2.5, 3.5, 4.5, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_double_past_fill():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "past", True)
     answer = [1, 1.5, 2.5, 3.5, 4.5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_double_future_fill():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "future", True)
     answer = [1.5, 2.5, 3.5, 4.5, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_double_midpoint_fill():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 2, "midpoint", True)
     answer = [1.5, 2.5, 3.5, 4.5, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_past():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 3, "past", False)
     answer = [1, 1.5, 2, 3, 4]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_future():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 3, "future", False)
     answer = [2, 3, 4, 4.5, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_midpoint():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 3, "midpoint", False)
     answer = [1.5, 2, 3, 4, 4.5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_past_fill():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 3, "past", True)
     answer = [1, 4 / 3, 2, 3, 4]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_future_fill():
     x = [1, 2, 3, 4, 5]
     y = running_average(x, 3, "future", True)
     answer = [2, 3, 4, 14 / 3, 5]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
 
 def test_running_average_triple_midpoint_fill():
     x = [1, 2, 3, 4 ,5]
     y = running_average(x, 3, "midpoint", True)
     answer = [4 / 3, 2, 3, 4, 14 / 3]
-    assert all(abs(a - b) < 1e-7 for (a, b) in zip(x, answer))
+    assert nearly(answer, y)
