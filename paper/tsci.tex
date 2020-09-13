@@ -282,7 +282,7 @@ Code movement tends to have checking- and assignment-type errors,
 while algorithm code tends to have, well, algorithm-type errors.
 This points to a principle for how to group code.
 \emph{Code Complete} gives seven types of cohesion that encourage
-grouping code together. We can add to that list. We should group
+grouping code together~\citep{mcconnell2004code}. We can add to that list. We should group
 code that needs similar kinds of unit testing because it poses
 similar kinds of risk. Here, that means we would do complete
 path testing on parameter handling. We might test random samples
@@ -295,11 +295,44 @@ how to read code so that we see cause and effect.
 
 \section{Path and data flow}
 
-We find problems in code by reading it, by testing it, or
-by running it on real problems. Both reading and testing rely on our ability
-to see cause and effect in code.
+My first assignment in high school chemistry was a six-inch square
+black box on my desk. Inside the box was some cardboard structure
+and a single marble. I had to make a sketch of the hidden cardboard
+structure by turning the box and feeling the weight of the marble
+and as it moved. Even if I couldn't see inside the box, I
+understood how a marble would balance, roll, and drop.
+
+A unit test sets parameters on a function and checks its result.
+I might get to read the code I'm testing (clear-box testing),
+or not (black-box testing). In either case, I need a feel for
+the physics of how each probing parameter might affect the
+function's return value. Analyzing cause and effect in code
+helps us read it. There are only three was we find problems
+in code. We read it during code reviews, we test it, or we run it on
+real world problems. The first two rely on reading code well,
+and the third is the definition of failure.
+
+\subsection{Code paths}
+
+If I look at the code in a function, it typically has
+some if--thens, some while--loops, some for--loops. These
+control structures determine which lines of the code do
+or don't get executed, depending on the input parameters.
+When we analyze code according to its control structures,
+it's called path analysis.
+
+Let's take a running average as an example. This code
+averages values over several days, and it will take an
+average of the last several days, the next several days,
+or in-between.
+
+\begin{lstlisting}[language=Python]
+def running_average(x, duration, orientation, fill):
+    
+\end{lstlisting}
 
 
+\subsection{Data flow}
 
 
 \section{Testing numbers}\label{sec:ieee-numbers}
