@@ -185,12 +185,26 @@ whether they are recoverable and how long it takes to discover
 the failure. Some algorithms are allowed to fail for certain
 input values, and we can recover by running a different, acceptable
 algorithm. Failures can be immediate exceptions that provide
-debugging information, or abnormal termination that quits with
+debugging information or abnormal termination that quits with
 only a single error code, but they
 could be \nan{}s that silently propagate through code. They
 could be loops that don't terminate, so you wait hours to find
-the problem. Worst, they could be wrong numbers that are
-close, but not close-enough.
+the problem.
+
+How your scientific application handles failures, and how you
+rank their severity, varies by application, as we can see from
+a few examples. If a software application has a menu of operations
+to perform, and one menu item incurs a fault, which creates an exception,
+then maybe the user sees an error message. That's not intended, but
+it means this one operation won't work on this data.
+If the scientific application is part of a large pipeline of
+work, and a fault creates a result that is out-of-bounds because
+it is negative or \textsc{NaN}, then that could be \textsc{ok}
+if there is a backup calculation that is more likely to succeed.
+In most cases, if I'm doing science, my main worry is when a
+fault \emph{doesn't lead to failure.} It's numbers that are
+significantly different from the correct value but not obviously
+wrong. It's faults without failures.
 
 Failures come from defects in the code, which we call \emph{faults,}
 and we classify these so that we know which are most important
@@ -436,12 +450,65 @@ somehow. We can begin to reason about where the fault must
 be that caused the observed failure.
 
 
+\subsection{Coverage metrics}
+
+Unit testing tools often report coverage metrics. These metrics
+estimate how much of your code is tested. The most common metric
+estimates what percentage of executable lines of code were invoked
+by any unit test. It's equivalent to reading the code for paths.
+
+Counting code paths undercounts the possible behaviors of the code.
+Every decision-point in the code generates a new path, so it's an
+if--then or a switch--case statement. Different branch statements
+don't generate a new code path.
+
+Counting code paths overemphasizes the importance of testing every
+line of code. There can be an if--then statement where one branch
+is either simple or will fail loudly if it's wrong, so we don't test
+that first.
+There are sections of code that carry less risk.
+While testing reduces risk, it makes changing code more difficult.
+Don't take one-hundred percent code coverage as a goal. Some
+projects do set a coverage goal at 70\,\% or 90\,\%, which is reasonable.
+
+
 \section{Testing numbers}\label{sec:ieee-numbers}
+
+If we take a look at a function that is nothing but a simple equation,
+\begin{lstlisting}
+quadratic_root_positive <- function(a, b, c) (-b + b^2 - 4 * a * c) / (2 * a)
+\end{lstlisting}
+it looks at once familiar to a mathematician and to a software engineer.
+It's clear to read, succinct in computation, and a well-known mistake.
+The variables \lstinline|(a, b, c)| aren't real numbers. They are floating-point
+numbers. While most software uses floating-point (floats) to tell time
+or count, these floats are hard-pressed by the more difficult task of doing
+math. Math with floating-point is a domain-specific skill that is new to
+most practitioners of scientific coding, so it's a source of confusion and risk,
+both for writing code and for testing it.
+
+
+\subsection{Floating-point data type}
+
+The \ieee~754--2008 standard leads the \cpu, the operating system, and 
+the language runtime, together, to guarantee a consistent, efficient environment
+for code to run. This minor miracle is fascinating~\citep{muller2018handbook},
+but its success is that you don't need to know more detail about it than
+you might find in \emph{Numerical computing with IEEE floating point arithmetic}~\citep{overton2001numerical,goldberg1991every}.
+
+Floating-point types represent the range of real numbers, from a maximum
+negative value to a maximum positive value, and negative and positive infinity
+(\lstinline|Inf|, \lstinline|-Inf|),
+and negative and positive values of zero (\lstinline|0| and \lstlinline|-0|). They also represent not-a-number,
+called \nan, which is not a real number.
+
+There are three main parts to the bit pattern that represents a floating-point
+type. One bit is the sign. Then there are
 
 The first thing that makes us call code scientific is the numbers themselves.
 Floating-point math causes its own kinds of failures. Some of these are simple,
 like dividing by zero or taking the square root of a negative number.
-Others are surprising, like the failure of an equality test.
+Others are surprising, like the failure of an equality test~\citep{muller2018handbook}.
 
 \subsection{Floating Point Exceptions}
 I shouldn't even say that division by zero is a simple failure.
@@ -461,8 +528,8 @@ same as \cpp exceptions, but they are what the \cpu reports when
 it has a problem, and they can bubble up to your code to become a
 language-level exception.
 \begin{itemize}
-    \item \emph{Invalid operation}---The square root of a negative
-    number, or zero divided by zero. Results in a \nan, which means
+    \item \emph{Invalid operation}---For example, the square root of a negative
+    number, zero divided by zero, adding infinity to itself, or comparison with \nan. Results in a \nan, which means
     ``not a number.''
     \item \emph{Division by zero}---Results in plus or minus infinity most
     of the time.
