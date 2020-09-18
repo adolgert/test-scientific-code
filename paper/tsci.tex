@@ -476,7 +476,7 @@ projects do set a coverage goal at 70\,\% or 90\,\%, which is reasonable.
 
 If we take a look at a function that is nothing but a simple equation,
 \begin{lstlisting}
-quadratic_root_positive <- function(a, b, c) (-b + b^2 - 4 * a * c) / (2 * a)
+quadratic_root_positive <- function(a, b, c) (-b + sqrt(b^2 - 4 * a * c)) / (2 * a)
 \end{lstlisting}
 it looks at once familiar to a mathematician and to a software engineer.
 It's clear to read, succinct in computation, and a well-known mistake.
@@ -490,73 +490,103 @@ both for writing code and for testing it.
 
 \subsection{Floating-point data type}
 
+A floating-point data type is usually fine taking the place of a real number
+in an equation. It often gives results that are correct to a decimal place
+of $10^{-17}.$ All of the common operations on real numbers are quick with
+the floating-point data type. It's a miracle in most cases.
+
 The \ieee~754--2008 standard leads the \cpu, the operating system, and 
 the language runtime, together, to guarantee a consistent, efficient environment
 for code to run. This minor miracle is fascinating~\citep{muller2018handbook},
 but its success is that you don't need to know more detail about it than
 you might find in \emph{Numerical computing with IEEE floating point arithmetic}~\citep{overton2001numerical,goldberg1991every}.
 
-Floating-point types represent the range of real numbers, from a maximum
-negative value to a maximum positive value, and negative and positive infinity
-(\lstinline|Inf|, \lstinline|-Inf|),
-and negative and positive values of zero (\lstinline|0| and \lstlinline|-0|). They also represent not-a-number,
-called \nan, which is not a real number.
+The data type we store in programs is usually encoded in a binary representation
+of four or eight bytes, which are 32 or 64 bits. Those bits represent three integers,
+one for the sign, one for the exponent and one for the significand. The sign is
+a single bit for $\pm 1$. The exponent is a power, the same way we would write
+scientific notation, except here the power is $2^e$, where $e$ runs from a
+negative value to a positive one. The significand is a series of bits that
+usually represent a number between one and two, $1 \le s < 2$, except in the
+case all bits are zero, which represents zero. None of these three
+integers are continuous values, but they can represent values that are
+sufficiently-close to every real value between some large negative number
+to some large positive number.
 
-There are three main parts to the bit pattern that represents a floating-point
-type. One bit is the sign. Then there are
+Floating-point types represent more than just real numbers, though. They
+also take the value $-\infty$ and $\infty$. In order to represent the inverse
+of these values, floating-point encodes both $0$ and $-0$, so that $1/(1 / -\infty)=-\infty$.
+Lastly, a floating-point type can indicate it isn't a number at all,
+by representing \nan.
 
-The first thing that makes us call code scientific is the numbers themselves.
-Floating-point math causes its own kinds of failures. Some of these are simple,
-like dividing by zero or taking the square root of a negative number.
-Others are surprising, like the failure of an equality test~\citep{muller2018handbook}.
+When floating-point calculations are working correctly, they can
+be unintuitive.
+
+\begin{lstlisting}
+0 == -0  # True
+-0 < 0  # False
+NaN == NaN  # False
+NaN < NaN  # False
+is.nan(3 * NaN)  # True
+\end{lstlisting}
+
+There seems to be a trick to asking whether a value is
+or isn't a \nan. Every language supplies some form of \lstinline|is.nan(x)|,
+and it's the only good way to find a \nan. There isn't even a single,
+defined bit pattern that represents \nan values, and library implementers
+have been known to sneak a birth date in there.
+
+The \nan value is designed to fail silently but visibly. It plays
+a crucial role in how floating-point is supposed to fail gracefully.
+
 
 \subsection{Floating Point Exceptions}
-I shouldn't even say that division by zero is a simple failure.
-One part of it is simple, that almost every language follows the
-\ieee~754 standard.
-A little book called \emph{Numerical computing with IEEE floating point arithmetic}
-describes both the \ieee~754 standard
-and some common implications for how you write equations in code~\citep{overton2001numerical,goldberg1991every}.
-The complicated part is that the application, compiler,
-and even operating system act as filters to decide whether the same division
-by zero will raise an exception, return infinity, or silently return not-a-number (\nan).
 
-According to \ieee~754, the lowest level of those filters begins
-as one of five exceptions that a floating-point
-operation, such as multiplication or addition, can raise. These aren't the
-same as \cpp exceptions, but they are what the \cpu reports when
-it has a problem, and they can bubble up to your code to become a
-language-level exception.
-\begin{itemize}
-    \item \emph{Invalid operation}---For example, the square root of a negative
-    number, zero divided by zero, adding infinity to itself, or comparison with \nan. Results in a \nan, which means
-    ``not a number.''
-    \item \emph{Division by zero}---Results in plus or minus infinity most
-    of the time.
-    \item \emph{Overflow}---When an operation results in a number
-    too large to represent, this can result either in infinity
-    or the largest representable number, depending on settings.
-    \item \emph{Underflow}---When an operation results in a number
-    that isn't zero but is too small to represent, it can result
-    in plus or minus zero, or the smallest representable number,
-    or a special value called a subnormal.
-    \item \emph{Inexact}---The result can't be represented exactly
-    with the \ieee standard. For example, 2.0 / 3.0. This happens a lot.
-\end{itemize}
-In some cases, these floating point exceptions will result in termination
-of a program. In other cases, the result is silently replaced
-with \nan, Infinity, zero, or the smallest number, as indicated above.
-When this happens is determined by your programming language,
-settings in the operating system, and, ultimately, settings
-in the \cpu itself.
+In those cases where a mathematical operation would be undefined
+for a real number, or where a floating-point type can't represent
+the answer, the \ieee~754 standard suggests using \nan or $\infty$ in order
+to alert the process that there has been a problem.
 
-Why would the world work this way? This \ieee standard has to guarantee
-maximal speed and correctness. It does fancy tricks with rounding
-and handling of very small numbers. However, it also offers
-careful handling of delicate calculations.
+There are three types of \emph{common floating-point exceptions}.
+Here, an exception isn't a \cpp{}-kind of exception. It means that
+there was a reported failure in a common operation.
 
-So what I do is read \cite{overton2001numerical} and write tests
-of the assumptions my code relies on.
+\begin{tabular}{lll}
+Invalid Operation & & \\
+ & \lstinline|1 / 0| & \nan \\
+ & \lstinline|0 \times \infty| & \\
+ & \lstinline|\infty / \infty| & \\
+ & \lstinline|1 REM 0| & \\
+ & \lstinline|\sqrt{-1}| & \\
+ & \lstinline|NaN < NaN| & \\
+ & invalid conversion & \\
+Division by Zero & & \\
+ & \lstinline|1 / 0| & $\pm\infty$ \\
+ & \lstinline|1 \log(0)| & \\
+Overflow & & \\
+ & \lstinline|exp(710)| & $\pm\infty$ or largest value\\
+\end{tabular}
+
+When we say that an overflow can result in either $\infty$ or
+the largest-representable floating-point value, that means you can
+usually choose how your code will handle the situation. You usually
+make these settings by telling the language runtime. That means your
+code will make a function call that requests that overflow use the
+largest value instead of infinity.
+
+More important for debugging, Windows, MacOS, and Linux, all give
+a process the option not to fail silently. In some cases, that means
+the operating system will kill the code when there is a floating-point
+exception. In some cases, the code can request that a handler-function
+be called. These are tools to help you find the fault that caused the
+failure. If you see a \nan and want to know when it happened, you can,
+in most languages, ask that the code stop the moment it would have made
+the \nan. Then a debugger can find the fault.
+
+A downside to making floating-point behavior configurable is that
+it might not be consistent from installation to installation.
+If this behavior is critical, and there are multiple target runtime
+environments, it can be helpful to unit test the necessary behavior.
 For instance, if a Python Pandas data frame returns a \nan when it
 takes a square root of a negative number, and my code relies that behavior,
 then I make a test that runs negative data through the code.
@@ -572,25 +602,6 @@ will make some choice that changes the behavior that I see today.
 
 
 \subsection{When Are Floats Equal?}
-The \ieee~754 standard is magically good at expressing real numbers as
-patterns of bits. It's both fast and correct-enough. It not only represents
-real numbers but also represents infinity, minus infinity, and
-not-a-number, or \nan. Then there is a separate representation of
-zero and minus zero, which have different bit patterns but, if you compare
-them, are equal.
-
-Comparison of \nan is a special case.
-A \nan will never equal another \nan, because every equality comparison with
-a \nan is false. If you ever check whether \lstinline|nan != x|, that will
-always be true, but how helpful is that?
-Every operation
-on a \nan yields a \nan. There isn't even a guarantee that the bit
-pattern that represents a \nan is the same in all cases.
-One implementation embedded someone's birthday in the \nan bits.
-You can, however, ask if infinity
-is equal to infinity. You can also ask if
-\lstinline!-0==0!, and that will be true. Rely on \lstinline!is.nan! and
-\lstinline!is.infinite!, or their equivalents in your language.
 
 Comparison of two floating points, the regular kind that aren't
 infinite or \nan, has its own problem. If you set
@@ -640,6 +651,12 @@ then it could be fine.
 
 
 \subsection{Discovering numerical analysis}
+
+\begin{lstlisting}
+quadratic_root_positive <- function(a, b, c) (-b + sqrt(b^2 - 4 * a * c)) / (2 * a)
+quadratic_root_positive <- function(a, b, c) 2*c / (-b-sqrt(b^2-4ac))
+\end{lstlisting}
+
 There are many cases where the representation of floating point
 creates problems for math in code. Take, for example, calculation
 of the mean age of death, for a model that assumes constant
