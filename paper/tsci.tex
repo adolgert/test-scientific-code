@@ -827,9 +827,13 @@ algebra creates a more stable solution.
 The unit test won't tell you how to fix the problem.
 It can show places where more numerical analysis is
 needed in order to have a stable representation of the math.
+In the same way that a floating-point type mirrors important
+properties of real numbers, we can modify a function to
+mirror important properties of the math we want it to represent,
+even though it will always remain a fundamentally different function.
 
 
-\section{Parameters in scientific code}
+\section{Parameters in scientific code}\label{sec:parameter-logic}
 If we need to implement some matrix algorithm, then
 we might make a function that has a few arguments: the matrix of data, algorithm parameters
 to control cutoffs in the algorithm, and options to determine whether
@@ -846,6 +850,369 @@ affect data flow in a function. The data flow is a graph
 of which values in a function depend on which previous values.
 The input matrix, itself, is effectively a two-dimensional matrix of
 parameters, greatly increasing the number of possible inputs to a function.
+
+
+\subsection{Decision Tables}\label{sec:parameter-decision}
+
+Given that scientific functions have large spaces of possible inputs,
+we have to choose which parameters and parameter
+combinations to test, and we limit the tests by identifying
+parameter values that are nearly-the-same test. For instance,
+if a function calculates age-standardized mortality rate, then testing
+the case where the mortality rate is 1.1 times larger hardly seems
+a different test. Instead, we might ask how the function handles
+missing values, zero values, or unusually sharp rises or falls in
+mortality rate. Sets of parameters that probe the same faults in
+the function under test are called \emph{equivalent.}
+
+% This is called Partition testing
+% You split by functionality, specification, requirements,
+% or you split by statement coverage, code coverage, branch coverage.
+% 
+% If everything in a partition fails, it is "homogeneous."
+Methods to test parameter logic all have the same underpinning,
+that they will try to test at least one set of parameters from
+each of the equivalence classes of inputs. Deciding what is an
+equivalence class can be difficult. Sometimes two parameters
+sets are equivalent in terms of the mathematical statement of 
+the model, but their representation in code makes one set
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
+the mathematical statement of a model makes clear what parameter
+sets may be equivalent. Information from both statements of
+a function will be helpful.
+
+A decision table is a list of parameters and the expected result
+of the function, arranged with one unit test per row. The
+tests can exhaust all possible parameter combinations or
+can have a row per equivalence class, when the number of combinations
+becomes large.
+
+For instance, consider a function that projects a time series
+using the trend of its running average. It could use the slope
+of the last $m$ entries in the time series. It could weight
+those last $m$ entries according to an exponential or Gaussian, so that
+earlier entries count less. It could transform the entries
+into log-space before projecting them. These options create
+sets of allowed parameters.
+\begin{center}
+\begin{tabular}{|l|l|l|l|l|}\hline
+$m$ & kernel & transform & range & output \\ \hline
+5 & Gaussian & linear & 1.0 & 2.7 \\
+5 & Gaussian & logarithmic & 2.0 & 1.9 \\
+5 & exponential & linear & 3.0 & 2.8 \\
+5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
+\end{tabular}
+\end{center}
+The clear table is pleasing, but we can see that, even for
+this small case, the list will be long. The example
+above doesn't even begin to probe error conditions, such
+as negative $m$ values or $m$ greater than the length
+of the data. We might define equivalence classes for each
+parameter, such as these.
+\begin{center}
+\begin{tabular}{|l|l|l|}\hline
+parameter & \# cases & cases \\
+$m$ & 5 & negative, 0, less than data, equal to data, more than data \\
+kernel & 2 & Gaussian, exponential \\
+range & 3 & negative, 0, positive \\
+transform & 2 & linear, logarithmic \\ \hline
+\end{tabular}
+\end{center}
+That makes $5 \times 2 \times 3\times 2 = 60$ cases.
+The table also fails to mention the most important
+parameter, the vector of data values.
+
+If a parameter is a vector of numbers, what to test depends
+even more on the particular math. Some suggestions:
+\begin{enumerate}
+    \item Set all values to a single edge case.
+    \item Try monotonically-increasing or decreasing.
+    \item Try non-increasing or non-decreasing (so that some
+    consecutive values are the same).
+    \item End points may be special, so test them separately.
+    \item If the vector is, in some way, smooth, construct
+    a vector where the maximum change, element to element, is no
+    more than some prescribed value. See how large that value can
+    be before the function fails.
+    \item Orthogonal arrays are random draws of values that
+    are spread out evenly through a multidimensional space.
+    They are one way to explore the space of input arrays~\citep{Owen1992}.
+\end{enumerate}
+Each of these suggestions becomes another category for
+equivalent inputs. If we used these five, then the total
+number of tests above would be $60\times 6 = 360$.
+
+
+\subsection{Limiting values of parameters}\label{sec:limits}
+
+Not every parallel implementation is a brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
+\subsection{Test Case Generation}
+When we decide to use test-driven design, we start each bout of
+coding by writing a test that mimics user input, and then we write
+code until the application responds correctly to the user.
+This is a high-level test, and it's an example of a test that
+has many parameters because, for a scientific application, it
+usually corresponds to adding a user-specified option to the
+sum of the input data and configuration files. There is no
+way to try every combination of inputs, and the application
+may take a long time to run.
+
+The luxury of combining every combination of input parameters
+is called \emph{combinatorial interaction testing.} We usually
+test some fraction of these possible inputs, called the
+\emph{test coverage fraction,} not to be confused with the
+term \emph{test coverage,} that refers to the percentage of
+all code paths that are run at least once by any unit test.
+
+How we choose which, of all possible tests, to run is a question
+of test design, the same way a doctor designs a randomized
+controlled trial or a botanist chooses treatments of plants
+in a field. Let's look at how the most common choices
+address risks in the code most efficiently.
+
+
+\subsubsection{Random parameter choices}
+
+The hardest part of generating test cases is choosing parameters
+that will find the most failures in the shortest time. Equivalence
+classes tell you which parameters will find the same failures,
+so they tell you which tests would be redundant. Given a set
+of tests, it's better to throw out those that are redundant,
+but the work to generate tests that aren't redundant can be cumbersome.
+The work to establish equivalence classes requires care,
+and sometimes parameters that seem equivalent might generate
+different failures.
+
+Randomized parameter generation avoids these problems. It's easier
+to generate parameters from a range or a set and to mix and match
+them at random. The tests might run longer to find a failure, but
+the tests are much faster to write, and you always know that longer
+runs have a better chance to find a failure. Every time you
+run twice as many tests, you increase the possibility of finding
+tests by fifty-percent. That's one kind of well-behaved.
+
+This doesn't mean the inputs have to be entirely random. For
+instance, if an input is a vector of numbers, it makes sense
+to randomly draw a length for the vector and then randomly
+draw each of the numbers, because using a random bit pattern
+would mean almost all vectors are near the maximum length.
+A vector that's created with a length draw is still random,
+but it's biased towards shorter vectors, because these tend
+to find faults in algorithms.
+Random parameters choices can be biased to choose more often
+those parameter sets that are more commonly used. They can
+be biased towards edge cases that might find failures. Either way,
+they are usually random with probability weights.
+
+Because random parameter generation is straightforward
+and predictable, it is very common and highly effective~\citep{arcuri2011random}.
+It makes most sense when unit tests don't take long to run
+and when it is possible to assign a known true answer, or trait
+of an answer, for all possible inputs.
+
+
+\subsubsection{Combinatorial excursions}
+If you decide that there is some most-common way to call
+the function, set that as the baseline. Then loop over parameters,
+trying all equivalence classes for each one. Then loop over pairs of parameters. Then sets of three. You define a limiting depth,
+where the full combinatorial excursion is the case where the
+limiting depth is the number of parameters.
+
+These tests would be highly-biased towards that baseline parameter set.
+It can make sense to define several most-important baseline
+parameter sets from which to conduct combinatorial excursions.
+
+
+\subsubsection{All pairs}
+What if we could guarantee, that if we pick any two parameters
+of a function, and we pick two values for those parameters,
+that there is at least one unit test that includes that combination
+of parameters? This is the all-pairs test design, to test
+every possible pairwise interaction among parameters.
+It packs these into as few tests as possible. For instance,
+the same unit test might be the only time that pair
+$(a=1, b=2)$ and pair $(c=3, d=4)$ appear, because their
+pairwise interaction appeared in the same test.
+
+All-pairs testing offers a feeling of completeness while
+using many fewer tests than even a depth-2 combinatorial
+excursion. There are claims that all-pairs testing almost
+always finds every fault in a function that full combinatorial
+excursions would fine~\citep{Pairwise}. It does not, however,
+do any better a job than the randomized testing of emphasizing
+particular parameter sets that the author decides carry
+the most risk for a function or application.
+
+The trick to using all-pairs testing is finding a library
+that will compute the sets of parameters to use. Finding
+those sets is, itself, an optimization problem.
+While AllPairsPy works for Python~\citep{allpairspy},
+and several papers cover algorithms~\citep{tung2000automating,pezze2008},
+there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
+
+
+\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
+The sections above all imply that there could be some way
+to emphasize which test are chosen, based on an assessment
+of which parameters carry the most risk. For instance, if
+a parameter is an option to make a copy of the input data
+before further work, it would be enough to test that exactly
+once, and not in all other parameter combinations. On
+the other hand, there may
+be certain parameter values that should be thoroughly-tested
+because they challenge the numerical precision of the algorithm.
+
+The ability to prefer tests of certain sets of parameter values
+is called \emph{stratification.} That means you take any
+of the test generation methods above and give the test author
+the ability to weight which tests it should generate.
+
+The throw out some of the generated tests is called
+\emph{filtering.} Sometimes it's easier to generate tests
+and toss useless ones than it is to generate the most-desired
+tests in the first place.
+
+Some of the more professional testing software includes
+these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
+\textsc{cts}~\citep{hartman2004problems},
+and the \textsc{act} library~\citep{kuhn2008automated}.
+
+
+\subsubsection{All Other Methods}
+The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
+are yet another way to generate tests that span the space of
+all possible parameters~\citep{Owen1992}.
+Whichever method you choose, it's
+good to have one of these methods available when it's time to
+do user-level testing on scientific code.
+\citet{petke2015practical} cover these strategies in their book,
+and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
+
+
+\subsection{Example}\label{sec:parameter-wilson}
+This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
+
+This function finds standard error from effective sample size for two
+different models. One is the binomial model, denoted ``proportion,''
+and the other is a demographic rate, denoted ``rate,'' which is not bounded
+by 1. For the binomial model, the Wilson score interval is
+\begin{equation}
+    \frac{\hat{p}+z^2/2n\pm z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
+\end{equation}
+where $z=z_{\alpha/2}$, so it's .975 for a $95\:\%$~confidence interval.
+I think it will translate between confidence interval and standard
+error by assuming asymptotic normality, which means assuming the
+confidence interval is
+\begin{equation}
+    p\pm z \times\mbox{standard error}.
+\end{equation}
+This means a standard error from Wilson's score interval comes from
+\begin{eqnarray}
+    z \times\mbox{standard error} & = & \frac{z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n} \\
+    \mbox{standard error} & = & \frac{\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
+\end{eqnarray}
+
+For the standard error of a rate, there are two calculations, an asymptotic one
+for large effective sample size and another for small effective sample size.
+For large sample sizes, standard error is $\sqrt{\lambda/n}$, as expected for Poisson
+rates. For small sample sizes, this code uses a linear interpolation between two values,
+which are the large sample size value, pinned to $\lambda n=5$, and the value $1/n$.
+\begin{equation}
+    \left(1-\frac{\lambda n}{5}\right) \frac{1}{n} + \left(\frac{\lambda n}{5}\right)\sqrt{\frac{5/n}{n}}.
+\end{equation}
+A larger selection of standard estimators for Poisson rates is in \citet{patil2012}.
+
+%https://stash.ihme.washington.edu/projects/CC/repos/cascade_ode/browse/cascade_ode/drill.py
+\begin{lstlisting}[language=Python]
+def se_from_ess(p, ess, param_type, cases=None,
+                quantile=0.975):
+    """ Calculates standard error from effective sample size
+    and mean based on the Wilson Score Interval """
+
+    err_msg = ("param_type must be either "
+               "'proportion' or 'rate'")
+    assert param_type in ['proportion', 'rate'], err_msg
+
+    if cases is None:
+        cases = p * ess
+
+    if ess == 0:
+        return 0
+
+    if param_type == "proportion":
+        z = stats.norm.ppf(quantile)
+        se = np.sqrt(p * (1 - p) / ess + z**2 / (4 * ess**2))
+    elif cases <= 5:
+        # Use linear interpolation for rate parameters
+        # with fewer than 5 cases
+        se = ((5 - p * ess) / ess + p *
+              ess * np.sqrt(5 / ess**2)) / 5
+    elif cases > 5:
+        # Use Poisson SE for rate parameters with more than
+        # 5 cases
+        se = np.sqrt(p / ess)
+    else:
+        raise Exception(
+            "Can't calculate SE... check your cases parameter")
+
+    return se
+\end{lstlisting}
+
+\begin{center}
+    \begin{tabular}{ll}
+    \hline
+    Variable & Possible Values \\ \hline
+    mean $p$ & $p<0$, $0<p<1$, $p=0$, $p>1$, single value or array \\
+    effective sample size $e_{ss}$ & $e_{ss} <0$, $0<e_{ss}<p/5$, $e_{ss}>p/5$ \\
+    param type & proportion, rate, other \\
+    cases & missing, None, negative, $<5$, $5$, $>5$ \\
+    quantile & missing, $0<q<1$, $q=1$, $q>1$ \\ \hline
+    \end{tabular}
+\end{center}
+The decision table will be quite large, but we can start with some
+particular values.
+\begin{center}
+    \begin{tabular}{llllll}
+    \hline
+    mean & ess & param type & cases & quantile & result \\ \hline
+    0.04 & 100 & rate & missing & 30 & $0.02$ \\
+    0.04 & 100 & None & missing & missing & assertion \\
+    0.04 & 0 & rate & missing & missing & 0 \\
+    (0.04, 0.01) & (0, 0) & rate & missing & missing & (0, 0)
+\end{tabular}
+\end{center}
+
+This function is written to handle an array of mean values.
+If the input mean is an array of numbers and the standard error
+is zero, the output of the function is a single zero, not an array
+of zeroes.
+
+\subsection{Conclusion}
+If you can separate parameter handling from the rest of the code,
+you can test better. The idea is to transform from input parameters
+that are user-friendly to those that are simpler for the algorithm
+to use.
+Think of parameter-handling as translation from an external
+     language to some kind of parameterization that's more
+     consistent, concise for internal processing.
+
 
 
 
@@ -1138,6 +1505,47 @@ themselves, or run first~\cite{yoo2012regression}.
 
 \section{Testing traits of a function}
 
+\subsection{Continuity}
+
+Another kind of limit is the distance between function results
+as the function inputs get closer to each other. We can often
+find faults in a function by testing continuity of the output.
+Here, a good unit test would mirror the definition of Lipshitz continuity.
+\begin{lstlisting}[language=python]
+C = 2.0
+for (x1, x2) in [(0, 1), (0, .1), (0, .001)]:
+    assert f(x2) - f(x1) < C * (x2 - x1)
+\end{lstlisting}
+The \lstinline!C! variable is a bounds on the slope for any
+pair of numbers.
+
+Sometimes a limit of a function is the same limit you know
+from high school precalculus,
+\begin{equation}
+  \lim_{x\rightarrow\infty} f(x).
+\end{equation}
+Maybe the limit goes to zero, or to 3, but the principle is
+the same. You can test that a function is near the limit
+as the value gets larger, or closer to zero. Better, you can
+test that the function gets closer to the limit as the
+parameter gets closer to its limit.
+
+\subsection{Approach to limiting values}
+
+This is a game where incremental understanding of math
+gives incrementally more careful attention to risk in the
+function under test. We can know the limiting value of a
+function, but we can also know how the function approaches
+that limit. Another precalculus friend, the Taylor series
+writes a function as a sum of terms that get smaller,
+\begin{equation}
+  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
+\end{equation}
+If we know the first term in the series, then the second term
+is a good guess for how far the function's output should be from
+the limiting value, as a function of $x$.
+
+
 \subsection{Using symmetry to test a function}\label{sec:symmetry-test}
 
 Sometimes knowing the math of a software function lets you
@@ -1404,408 +1812,6 @@ a function isn't too wrong.
 
 
 
-\section{Testing parameter logic}\label{sec:parameter-logic}
-
-\subsection{Decision Tables}\label{sec:parameter-decision}
-
-Given that scientific functions have large spaces of possible inputs,
-we have to choose which parameters and parameter
-combinations to test, and we limit the tests by identifying
-parameter values that are nearly-the-same test. For instance,
-if a function calculates age-standardized mortality rate, then testing
-the case where the mortality rate is 1.1 times larger hardly seems
-a different test. Instead, we might ask how the function handles
-missing values, zero values, or unusually sharp rises or falls in
-mortality rate. Sets of parameters that probe the same faults in
-the function under test are called \emph{equivalent.}
-
-% This is called Partition testing
-% You split by functionality, specification, requirements,
-% or you split by statement coverage, code coverage, branch coverage.
-% 
-% If everything in a partition fails, it is "homogeneous."
-Methods to test parameter logic all have the same underpinning,
-that they will try to test at least one set of parameters from
-each of the equivalence classes of inputs. Deciding what is an
-equivalence class can be difficult. Sometimes two parameters
-sets are equivalent in terms of the mathematical statement of 
-the model, but their representation in code makes one set
-have a different risk from another. For instance, a function of small
-values would be well-defined as an equation, but it could cause
-denormalization when written in code.
-It can also be the other way around, that
-the mathematical statement of a model makes clear what parameter
-sets may be equivalent. Information from both statements of
-a function will be helpful.
-
-A decision table is a list of parameters and the expected result
-of the function, arranged with one unit test per row. The
-tests can exhaust all possible parameter combinations or
-can have a row per equivalence class, when the number of combinations
-becomes large.
-
-For instance, consider a function that projects a time series
-using the trend of its running average. It could use the slope
-of the last $m$ entries in the time series. It could weight
-those last $m$ entries according to an exponential or Gaussian, so that
-earlier entries count less. It could transform the entries
-into log-space before projecting them. These options create
-sets of allowed parameters.
-\begin{center}
-\begin{tabular}{|l|l|l|l|l|}\hline
-$m$ & kernel & transform & range & output \\ \hline
-5 & Gaussian & linear & 1.0 & 2.7 \\
-5 & Gaussian & logarithmic & 2.0 & 1.9 \\
-5 & exponential & linear & 3.0 & 2.8 \\
-5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
-\end{tabular}
-\end{center}
-The clear table is pleasing, but we can see that, even for
-this small case, the list will be long. The example
-above doesn't even begin to probe error conditions, such
-as negative $m$ values or $m$ greater than the length
-of the data. We might define equivalence classes for each
-parameter, such as these.
-\begin{center}
-\begin{tabular}{|l|l|l|}\hline
-parameter & \# cases & cases \\
-$m$ & 5 & negative, 0, less than data, equal to data, more than data \\
-kernel & 2 & Gaussian, exponential \\
-range & 3 & negative, 0, positive \\
-transform & 2 & linear, logarithmic \\ \hline
-\end{tabular}
-\end{center}
-That makes $5 \times 2 \times 3\times 2 = 60$ cases.
-The table also fails to mention the most important
-parameter, the vector of data values.
-
-If a parameter is a vector of numbers, what to test depends
-even more on the particular math. Some suggestions:
-\begin{enumerate}
-    \item Set all values to a single edge case.
-    \item Try monotonically-increasing or decreasing.
-    \item Try non-increasing or non-decreasing (so that some
-    consecutive values are the same).
-    \item End points may be special, so test them separately.
-    \item If the vector is, in some way, smooth, construct
-    a vector where the maximum change, element to element, is no
-    more than some prescribed value. See how large that value can
-    be before the function fails.
-    \item Orthogonal arrays are random draws of values that
-    are spread out evenly through a multidimensional space.
-    They are one way to explore the space of input arrays~\citep{Owen1992}.
-\end{enumerate}
-Each of these suggestions becomes another category for
-equivalent inputs. If we used these five, then the total
-number of tests above would be $60\times 6 = 360$.
-
-
-\subsection{Limiting values of parameters}\label{sec:limits}
-
-Not every parallel implementation is a brute-force retelling
-of a model. Most mathematical functions provide finger-holds
-support of their correctness.
-
-The simplest of these are parameters for which a function
-takes a known value. The function could be a mess of
-polynomials of trigonometric quantities,
-\begin{equation}
-  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
-\end{equation}
-but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
-and so on. If the function should divide by zero for some
-number, then that, too, is a parameter for which the function
-has a known value, an exception.
-
-Another kind of limit is the distance between function results
-as the function inputs get closer to each other. We can often
-find faults in a function by testing continuity of the output.
-Here, a good unit test would mirror the definition of Lipshitz continuity.
-\begin{lstlisting}[language=python]
-C = 2.0
-for (x1, x2) in [(0, 1), (0, .1), (0, .001)]:
-    assert f(x2) - f(x1) < C * (x2 - x1)
-\end{lstlisting}
-The \lstinline!C! variable is a bounds on the slope for any
-pair of numbers.
-
-Sometimes a limit of a function is the same limit you know
-from high school precalculus,
-\begin{equation}
-  \lim_{x\rightarrow\infty} f(x).
-\end{equation}
-Maybe the limit goes to zero, or to 3, but the principle is
-the same. You can test that a function is near the limit
-as the value gets larger, or closer to zero. Better, you can
-test that the function gets closer to the limit as the
-parameter gets closer to its limit.
-
-This is a game where incremental understanding of math
-gives incrementally more careful attention to risk in the
-function under test. We can know the limiting value of a
-function, but we can also know how the function approaches
-that limit. Another precalculus friend, the Taylor series
-writes a function as a sum of terms that get smaller,
-\begin{equation}
-  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
-\end{equation}
-If we know the first term in the series, then the second term
-is a good guess for how far the function's output should be from
-the limiting value, as a function of $x$.
-
-
-\subsection{Test Case Generation}
-When we decide to use test-driven design, we start each bout of
-coding by writing a test that mimics user input, and then we write
-code until the application responds correctly to the user.
-This is a high-level test, and it's an example of a test that
-has many parameters because, for a scientific application, it
-usually corresponds to adding a user-specified option to the
-sum of the input data and configuration files. There is no
-way to try every combination of inputs, and the application
-may take a long time to run.
-
-The luxury of combining every combination of input parameters
-is called \emph{combinatorial interaction testing.} We usually
-test some fraction of these possible inputs, called the
-\emph{test coverage fraction,} not to be confused with the
-term \emph{test coverage,} that refers to the percentage of
-all code paths that are run at least once by any unit test.
-
-How we choose which, of all possible tests, to run is a question
-of test design, the same way a doctor designs a randomized
-controlled trial or a botanist chooses treatments of plants
-in a field. Let's look at how the most common choices
-address risks in the code most efficiently.
-
-
-\subsubsection{Random parameter choices}
-
-The hardest part of generating test cases is choosing parameters
-that will find the most failures in the shortest time. Equivalence
-classes tell you which parameters will find the same failures,
-so they tell you which tests would be redundant. Given a set
-of tests, it's better to throw out those that are redundant,
-but the work to generate tests that aren't redundant can be cumbersome.
-The work to establish equivalence classes requires care,
-and sometimes parameters that seem equivalent might generate
-different failures.
-
-Randomized parameter generation avoids these problems. It's easier
-to generate parameters from a range or a set and to mix and match
-them at random. The tests might run longer to find a failure, but
-the tests are much faster to write, and you always know that longer
-runs have a better chance to find a failure. Every time you
-run twice as many tests, you increase the possibility of finding
-tests by fifty-percent. That's one kind of well-behaved.
-
-This doesn't mean the inputs have to be entirely random. For
-instance, if an input is a vector of numbers, it makes sense
-to randomly draw a length for the vector and then randomly
-draw each of the numbers, because using a random bit pattern
-would mean almost all vectors are near the maximum length.
-A vector that's created with a length draw is still random,
-but it's biased towards shorter vectors, because these tend
-to find faults in algorithms.
-Random parameters choices can be biased to choose more often
-those parameter sets that are more commonly used. They can
-be biased towards edge cases that might find failures. Either way,
-they are usually random with probability weights.
-
-Because random parameter generation is straightforward
-and predictable, it is very common and highly effective~\citep{arcuri2011random}.
-It makes most sense when unit tests don't take long to run
-and when it is possible to assign a known true answer, or trait
-of an answer, for all possible inputs.
-
-
-\subsubsection{Combinatorial excursions}
-If you decide that there is some most-common way to call
-the function, set that as the baseline. Then loop over parameters,
-trying all equivalence classes for each one. Then loop over pairs of parameters. Then sets of three. You define a limiting depth,
-where the full combinatorial excursion is the case where the
-limiting depth is the number of parameters.
-
-These tests would be highly-biased towards that baseline parameter set.
-It can make sense to define several most-important baseline
-parameter sets from which to conduct combinatorial excursions.
-
-
-\subsubsection{All pairs}
-What if we could guarantee, that if we pick any two parameters
-of a function, and we pick two values for those parameters,
-that there is at least one unit test that includes that combination
-of parameters? This is the all-pairs test design, to test
-every possible pairwise interaction among parameters.
-It packs these into as few tests as possible. For instance,
-the same unit test might be the only time that pair
-$(a=1, b=2)$ and pair $(c=3, d=4)$ appear, because their
-pairwise interaction appeared in the same test.
-
-All-pairs testing offers a feeling of completeness while
-using many fewer tests than even a depth-2 combinatorial
-excursion. There are claims that all-pairs testing almost
-always finds every fault in a function that full combinatorial
-excursions would fine~\citep{Pairwise}. It does not, however,
-do any better a job than the randomized testing of emphasizing
-particular parameter sets that the author decides carry
-the most risk for a function or application.
-
-The trick to using all-pairs testing is finding a library
-that will compute the sets of parameters to use. Finding
-those sets is, itself, an optimization problem.
-While AllPairsPy works for Python~\citep{allpairspy},
-and several papers cover algorithms~\citep{tung2000automating,pezze2008},
-there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
-
-
-\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
-The sections above all imply that there could be some way
-to emphasize which test are chosen, based on an assessment
-of which parameters carry the most risk. For instance, if
-a parameter is an option to make a copy of the input data
-before further work, it would be enough to test that exactly
-once, and not in all other parameter combinations. On
-the other hand, there may
-be certain parameter values that should be thoroughly-tested
-because they challenge the numerical precision of the algorithm.
-
-The ability to prefer tests of certain sets of parameter values
-is called \emph{stratification.} That means you take any
-of the test generation methods above and give the test author
-the ability to weight which tests it should generate.
-
-The throw out some of the generated tests is called
-\emph{filtering.} Sometimes it's easier to generate tests
-and toss useless ones than it is to generate the most-desired
-tests in the first place.
-
-Some of the more professional testing software includes
-these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
-\textsc{cts}~\citep{hartman2004problems},
-and the \textsc{act} library~\citep{kuhn2008automated}.
-
-
-\subsubsection{All Other Methods}
-The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
-are yet another way to generate tests that span the space of
-all possible parameters~\citep{Owen1992}.
-Whichever method you choose, it's
-good to have one of these methods available when it's time to
-do user-level testing on scientific code.
-\citet{petke2015practical} cover these strategies in their book,
-and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
-
-
-\subsection{Example}\label{sec:parameter-wilson}
-This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
-
-This function finds standard error from effective sample size for two
-different models. One is the binomial model, denoted ``proportion,''
-and the other is a demographic rate, denoted ``rate,'' which is not bounded
-by 1. For the binomial model, the Wilson score interval is
-\begin{equation}
-    \frac{\hat{p}+z^2/2n\pm z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
-\end{equation}
-where $z=z_{\alpha/2}$, so it's .975 for a $95\:\%$~confidence interval.
-I think it will translate between confidence interval and standard
-error by assuming asymptotic normality, which means assuming the
-confidence interval is
-\begin{equation}
-    p\pm z \times\mbox{standard error}.
-\end{equation}
-This means a standard error from Wilson's score interval comes from
-\begin{eqnarray}
-    z \times\mbox{standard error} & = & \frac{z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n} \\
-    \mbox{standard error} & = & \frac{\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
-\end{eqnarray}
-
-For the standard error of a rate, there are two calculations, an asymptotic one
-for large effective sample size and another for small effective sample size.
-For large sample sizes, standard error is $\sqrt{\lambda/n}$, as expected for Poisson
-rates. For small sample sizes, this code uses a linear interpolation between two values,
-which are the large sample size value, pinned to $\lambda n=5$, and the value $1/n$.
-\begin{equation}
-    \left(1-\frac{\lambda n}{5}\right) \frac{1}{n} + \left(\frac{\lambda n}{5}\right)\sqrt{\frac{5/n}{n}}.
-\end{equation}
-A larger selection of standard estimators for Poisson rates is in \citet{patil2012}.
-
-%https://stash.ihme.washington.edu/projects/CC/repos/cascade_ode/browse/cascade_ode/drill.py
-\begin{lstlisting}[language=Python]
-def se_from_ess(p, ess, param_type, cases=None,
-                quantile=0.975):
-    """ Calculates standard error from effective sample size
-    and mean based on the Wilson Score Interval """
-
-    err_msg = ("param_type must be either "
-               "'proportion' or 'rate'")
-    assert param_type in ['proportion', 'rate'], err_msg
-
-    if cases is None:
-        cases = p * ess
-
-    if ess == 0:
-        return 0
-
-    if param_type == "proportion":
-        z = stats.norm.ppf(quantile)
-        se = np.sqrt(p * (1 - p) / ess + z**2 / (4 * ess**2))
-    elif cases <= 5:
-        # Use linear interpolation for rate parameters
-        # with fewer than 5 cases
-        se = ((5 - p * ess) / ess + p *
-              ess * np.sqrt(5 / ess**2)) / 5
-    elif cases > 5:
-        # Use Poisson SE for rate parameters with more than
-        # 5 cases
-        se = np.sqrt(p / ess)
-    else:
-        raise Exception(
-            "Can't calculate SE... check your cases parameter")
-
-    return se
-\end{lstlisting}
-
-\begin{center}
-    \begin{tabular}{ll}
-    \hline
-    Variable & Possible Values \\ \hline
-    mean $p$ & $p<0$, $0<p<1$, $p=0$, $p>1$, single value or array \\
-    effective sample size $e_{ss}$ & $e_{ss} <0$, $0<e_{ss}<p/5$, $e_{ss}>p/5$ \\
-    param type & proportion, rate, other \\
-    cases & missing, None, negative, $<5$, $5$, $>5$ \\
-    quantile & missing, $0<q<1$, $q=1$, $q>1$ \\ \hline
-    \end{tabular}
-\end{center}
-The decision table will be quite large, but we can start with some
-particular values.
-\begin{center}
-    \begin{tabular}{llllll}
-    \hline
-    mean & ess & param type & cases & quantile & result \\ \hline
-    0.04 & 100 & rate & missing & 30 & $0.02$ \\
-    0.04 & 100 & None & missing & missing & assertion \\
-    0.04 & 0 & rate & missing & missing & 0 \\
-    (0.04, 0.01) & (0, 0) & rate & missing & missing & (0, 0)
-\end{tabular}
-\end{center}
-
-This function is written to handle an array of mean values.
-If the input mean is an array of numbers and the standard error
-is zero, the output of the function is a single zero, not an array
-of zeroes.
-
-\subsection{Conclusion}
-If you can separate parameter handling from the rest of the code,
-you can test better. The idea is to transform from input parameters
-that are user-friendly to those that are simpler for the algorithm
-to use.
-Think of parameter-handling as translation from an external
-     language to some kind of parameterization that's more
-     consistent, concise for internal processing.
-
-
-
 
 \section{Testing data movement}\label{sec:data-movement}
 
@@ -1982,10 +1988,22 @@ each of the 576 kinds of inputs.
 
 \section{Outside the code}\label{sec:outside-code}
 
-% Qualities in code differ between scientific and non-scientific
-% The lifetime of a single component begins with emphasis on
-% changing the code easily, moves to emphasis on correctness,
-% and ends with emphasis on usability (adding options).
+\subsection{Process}
+
+The most important non-functional qualities in research code are that it
+is transparent and changeable. We want to be nimble and expressive
+with our coding experiments. By the time this research code
+becomes more established, we think more about ensuring efficiency
+and that the code be usable. It should support optional ways to
+call it. Somewhere in-between the birth of a new function and its
+adoption into our library of code, we find ways to ensure its
+correctness.
+
+These conflicting priorities create tension in priorities.
+More testing makes code more brittle. Early work is about
+experimentation, and later work is about confirmation and
+expansion of capability.
+
 
 \subsection{Documentation defines what a function wants to be}
 
