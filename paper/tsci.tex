@@ -73,6 +73,24 @@ and others are particular to testing scientific code.
 % b) software engineers who implement code but aren't sure how to handle
 %    tests of squirrelly math.
 
+% Intention:
+% Sleuthing to reveal how mathematical expectations become test assertions.
+% Literature says research code has an "oracle problem."
+% I don't like that term. So what if we don't know the exact number
+% a function can produce? All unit testing, mathematical or otherwise
+% is about testing whether expectations are met, and those can
+% be hard to define. We always have some expectations
+% about how new research code will behave. The challenge is to
+% a) understand what our expectations are and b) express those
+% expectations in unit tests in c) a way that reduces risk.
+
+% Major sections
+% 1. Reading for risk
+% 2. Parallel implementation
+% 3. Statistics for tests
+% 4. Deterministic repeated measures
+% 5. Methods and motives, the process in context
+
 % From Mike Richards
 % 2. Focus on moving up and down the stack, not between scientist and developer.
 % You don't need to tell them everything about the subject.
@@ -107,6 +125,10 @@ and others are particular to testing scientific code.
 
 \tableofcontents
 \section{Introduction}\label{sec:introduction}
+
+% In most code, you expect a value. For scientific code, your
+% expectations are properties of the code or in relation to
+% previous work. It's about discovering expectations.
 
 The code for a scientific application, laid out across a monitor,
 will have plenty of functions that look like those of any other application.
@@ -326,7 +348,7 @@ in code. We read it during code reviews, we test it, or we run it on
 real world problems. The first two rely on reading code well,
 and the third is the definition of failure.
 
-\subsection{Code paths}
+\subsection{Code paths}\label{sec:code-paths}
 
 If I look at the code in a function, it typically has
 some if--thens, some while--loops, some for--loops. These
@@ -366,7 +388,7 @@ def running_average(x, duration, orientation, fill):
     return result
 \end{lstlisting}
 
-If \lstinline|fill=True|, the lines 11--15 are run.
+\noindent{}If \lstinline|fill=True|, the lines 11--15 are run.
 If it's false, lines 17--21 are run. We can further subdivide
 these two blocks by observing that, if the length of \lstinline|x|
 is 0, then the for--loop won't run. Therefore, that's a separate
@@ -388,18 +410,47 @@ and \lstinline|len(x) > 0|.
     \item 1, 4, 5, 6
     \item 1, 4, 6
 \end{itemize}
-This isn't the whole story, though.
+Two of them are much less likely. You can either decide that
+they are less important because they are less likely, or
+you can decide that they are important to test separately
+because other parts of the tests will cover the more common
+paths.
 
-The four paths come from analyzing decisions in the code, which
-are if--then, for--loops, and while--loops. The code also has
-a branch point, where the code chooses which orientation to
-the window. Another example of a branch point would be selection
-from a data frame.
+Not every if--then is a separate path. Consider a case where
+the same option is used twice.
+
+\begin{lstlisting}[language=Python,numbers=left]
+def sample(x, option = false):
+    if option:
+        k = 3
+    else:
+        k = 2
+    y = k * x
+    if option:
+        z = [abs[m] for m in y]
+    else:
+        z = y
+    return z
+\end{lstlisting}
+
+\noindent{}There are two if--thens, which would lead to four different
+paths, except that they use the same condition. Depending on
+how complicated the condition is, it may not be obvious that
+the paths are related to each other.
+
+Path testing is an approximation to the number of different
+ways to call a function. Looking at the code line-by-line,
+we can see finer branches in how a function handles inputs.
+Branch points are conditions that depend on input values
+but don't change which lines of code are run. For example,
+data frames are built to enable easy branch points.
 \begin{lstlisting}
 under30 <- individuals_df[individuals_df$age < 30, ]
 \end{lstlisting}
 It isn't an if--then, but data above and below 30 will take
-different paths through the code.
+different paths through the code. Data frames are built
+to handle complicated inputs, so they are built to create
+complicated testing problems.
 
 Path testing is a way to get a clear view of
 the code, but it's just one model for how to read code.
@@ -450,7 +501,28 @@ somehow. We can begin to reason about where the fault must
 be that caused the observed failure.
 
 
-\subsection{Coverage metrics}
+\subsection{Complexity and Coverage}
+
+Sometimes your code editor will read your code in order to help
+you assess risk. Most editors have add-ins that will compute
+computational complexity, even as you type. Cyclomatic complexity
+is a count of the number of code paths, as described in Sec.~\ref{sec:code-paths}. A script without functions can have a computational
+complexity in the thousands. Most small functions have a computational
+complexity under sixteen, meaning there are less than four binary
+decisions (2 x 2 x 2 x 2). High computational complexity is a
+classic indicator of risk.
+
+Scientific code has high mathematical complexity, which is a count
+of the number of mathematical operators and function calls in a
+function. We know \lstinline|2*x| is less complex than
+\lstinline|a*x^2 + b*x + c|.
+I haven't seen a general tool that calculates this. Some tools
+calculate a related set of metrics called Halstead complexity,
+but those count every operator and operand in a function.
+When I estimate risk in a mathematical function, I look at
+the number of equations and the number of operators and operands
+in those equations in order to gauge how likely I misplaced a
+parenthesis or juggled two variables.
 
 Unit testing tools often report coverage metrics. These metrics
 estimate how much of your code is tested. The most common metric
@@ -470,6 +542,7 @@ There are sections of code that carry less risk.
 While testing reduces risk, it makes changing code more difficult.
 Don't take one-hundred percent code coverage as a goal. Some
 projects do set a coverage goal at 70\,\% or 90\,\%, which is reasonable.
+
 
 
 \section{Testing numbers}\label{sec:ieee-numbers}
@@ -554,15 +627,15 @@ there was a reported failure in a common operation.
 \begin{tabular}{lll}
 Invalid Operation & & \\
  & \lstinline|1 / 0| & \nan \\
- & \lstinline|0 \times \infty| & \\
- & \lstinline|\infty / \infty| & \\
+ & \lstinline|0 * Inf| & \\
+ & \lstinline|Inf / Inf| & \\
  & \lstinline|1 REM 0| & \\
- & \lstinline|\sqrt{-1}| & \\
+ & \lstinline|sqrt(-1)| & \\
  & \lstinline|NaN < NaN| & \\
  & invalid conversion & \\
 Division by Zero & & \\
  & \lstinline|1 / 0| & $\pm\infty$ \\
- & \lstinline|1 \log(0)| & \\
+ & \lstinline|1 * log(0)| & \\
 Overflow & & \\
  & \lstinline|exp(710)| & $\pm\infty$ or largest value\\
 \end{tabular}
@@ -652,10 +725,54 @@ then it could be fine.
 
 \subsection{Discovering numerical analysis}
 
+At the start of Sec.~\ref{sec:ieee-numbers}, I said that the
+quadratic formula had a problem. For positive values of $b$
+and small values of $a$ and $c$, the quadratic formula subtracts
+a number from nearly-the-same value. We know that floating-point
+types are excellent at representing numbers near zero, but they
+lose precision for larger numbers. By playing with the quadratic
+equation, we can see a way to write it that doesn't have the same
+problem.
+
 \begin{lstlisting}
 quadratic_root_positive <- function(a, b, c) (-b + sqrt(b^2 - 4 * a * c)) / (2 * a)
-quadratic_root_positive <- function(a, b, c) 2*c / (-b-sqrt(b^2-4ac))
+quadratic_root_positive_alt <- function(a, b, c) 2*c / (-b-sqrt(b^2-4ac))
 \end{lstlisting}
+
+If we use the second version whenever $b>0$, then there won't
+be difficulty.
+There is a similar rewriting for $b<0$~\citep{overton2001numerical}.
+
+If I had written the first equation and wasn't working through
+numerical analysis of it, how would I know there was a problem?
+
+\begin{lstlisting}
+test_that("quadratic formula OK for small a and c", {
+    a <- 1e-2
+    b <- 50
+    c <- 1e-5
+    root <- quadratic_root_positive(a, b, c)
+    agreement <- a * root^2 + b * root + c
+    expect_true(abs(agreement) < 1e-10)
+})
+\end{lstlisting}
+
+The quadratic equation, in the code, was never wrong. It returned
+the correct values for the equation, given that its domain is
+three floating-point types. The quadratic equation in the code
+is also the one you have in hand. The unit test asks whether
+it meets the expectations we have of the quadratic equation
+acting on real numbers. We assess our expectations and judge
+where they might not be met.
+
+\noindent{}The unit test asks whether the root does produce a
+zero value. It's careful about estimating how precise that value
+should be. The value $10^{-10}$ is smaller than expected error
+for single-precision floats but should be well within the realm
+of error for double-precision floats. We would guess to test
+in this region because we know that, for floating-point types,
+it can be important to test near boundary values, including
+zero, because the data type has different behavior.
 
 There are many cases where the representation of floating point
 creates problems for math in code. Take, for example, calculation
@@ -704,10 +821,13 @@ function constant_mortality_mean_age(mx, nx)
 end
 \end{lstlisting}
 This equation is stable near zero mortality rate.
+As with the quadratic equation, a little rewriting of the
+algebra creates a more stable solution.
 
 The unit test won't tell you how to fix the problem.
 It can show places where more numerical analysis is
 needed in order to have a stable representation of the math.
+
 
 \section{Parameters in scientific code}
 If we need to implement some matrix algorithm, then
@@ -727,19 +847,6 @@ of which values in a function depend on which previous values.
 The input matrix, itself, is effectively a two-dimensional matrix of
 parameters, greatly increasing the number of possible inputs to a function.
 
-
-
-\section{Complexity}
-
-
-\textbf{Mathematical Complexity}---Has your code editor ever told you,
-"Computational complexity 16, project limit is 15. Please refactor?"
-\emph{Computational complexity} looks at every if--then--else and counts the
-number of possible paths through a function.
-Scientific code has high \emph{mathematical complexity,\/} which is a
-count of the number of mathematical operators and function calls in
-a function. Would you want your linter to insist on low mathematical complexity in
-a function?
 
 
 \section{Parallel Implementation}\label{sec:parallel-implementation}
@@ -1874,6 +1981,11 @@ each of the 576 kinds of inputs.
 
 
 \section{Outside the code}\label{sec:outside-code}
+
+% Qualities in code differ between scientific and non-scientific
+% The lifetime of a single component begins with emphasis on
+% changing the code easily, moves to emphasis on correctness,
+% and ends with emphasis on usability (adding options).
 
 \subsection{Documentation defines what a function wants to be}
 
