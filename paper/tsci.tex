@@ -3,6 +3,17 @@
 % Use option lineno for line numbers 
 \usepackage{xcolor}
 \usepackage{framed}
+\usepackage{hyperref}
+\colorlet{darkblue}{blue!40!black}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    citecolor=darkblue
+}
+\urlstyle{same}
+
 \usepackage{xspace}
 \usepackage[utf8]{inputenc}
 \usepackage{fontspec}
@@ -98,19 +109,12 @@ and others are particular to testing scientific code.
 % James presses about the audience and software vs. math.
 
 % TODO
-% This is limited to functional testing, not performance or other.
 % Missing: fault localization, model-based testing
-% Read random testing paper.
 % add simple stats tests from the intro modern stats book
-% add truth about domain clash between software and math.
 % add figures to explain pearson coefficient
-% explain mantiss and exponent.
-% focus floating point on what they need to know, not an exceptions list.
-% learn more on acceptance testing.
+% explain mantissa and exponent.
 % add more symmetry examples.
-% Read more recent mutation test papers to be fair to it.
 % show path analysis and flow analysis as figures.
-% Add a 4.6 on testing against a fixed list of known good values.
 % Take a failing test and reduce the input until you have
 % a smallest failing test. Very helpful for identifying failures.
 
@@ -501,7 +505,7 @@ somehow. We can begin to reason about where the fault must
 be that caused the observed failure.
 
 
-\subsection{Complexity and Coverage}
+\subsection{Complexity and coverage}
 
 Sometimes your code editor will read your code in order to help
 you assess risk. Most editors have add-ins that will compute
@@ -613,7 +617,7 @@ The \nan value is designed to fail silently but visibly. It plays
 a crucial role in how floating-point is supposed to fail gracefully.
 
 
-\subsection{Floating Point Exceptions}
+\subsection{Floating point exceptions}
 
 In those cases where a mathematical operation would be undefined
 for a real number, or where a floating-point type can't represent
@@ -674,7 +678,7 @@ Windows to someone else's installation of Windows,
 will make some choice that changes the behavior that I see today.
 
 
-\subsection{When Are Floats Equal?}
+\subsection{When are floats equal?}
 
 Comparison of two floating points, the regular kind that aren't
 infinite or \nan, has its own problem. If you set
@@ -833,26 +837,13 @@ mirror important properties of the math we want it to represent,
 even though it will always remain a fundamentally different function.
 
 
-\section{Parameters in scientific code}\label{sec:parameter-logic}
-If we need to implement some matrix algorithm, then
-we might make a function that has a few arguments: the matrix of data, algorithm parameters
-to control cutoffs in the algorithm, and options to determine whether
-the result is written back into the source matrix memory.
-The data, algorithm parameters, and options are all, in the eyes of unit testing,
-parameters.
+\section{Testing by classes of parameters}\label{sec:parameter-logic}
 
-These three kinds of parameters, however, tend to affect functions
-differently. Options appear in the test of if--thens, so they change
-the code path. The code path is the sequence of blocks of code that execute
-for a particular set of parameters.
-Algorithm parameters tend to appear in key equations, so that they
-affect data flow in a function. The data flow is a graph
-of which values in a function depend on which previous values.
-The input matrix, itself, is effectively a two-dimensional matrix of
-parameters, greatly increasing the number of possible inputs to a function.
+When our expectations reduce to a rule: if I send this in, then it
+sends that back.
 
 
-\subsection{Decision Tables}\label{sec:parameter-decision}
+\subsection{Decision tables}\label{sec:parameter-decision}
 
 Given that scientific functions have large spaces of possible inputs,
 we have to choose which parameters and parameter
@@ -946,8 +937,17 @@ equivalent inputs. If we used these five, then the total
 number of tests above would be $60\times 6 = 360$.
 
 
-\subsection{Limiting values of parameters}\label{sec:limits}
+\subsection{Parameter equivalence}\label{sec:limits}
 
+\subsection{Equivalence classes}
+
+What would it mean to test all possible parameters?
+What would it mean to test all possible failures?
+What would it mean to test all possible faults?
+What would it mean to test all possible expectations?
+
+
+\subsubsection{Boundary values for floating point types}
 Not every parallel implementation is a brute-force retelling
 of a model. Most mathematical functions provide finger-holds
 support of their correctness.
@@ -963,7 +963,127 @@ and so on. If the function should divide by zero for some
 number, then that, too, is a parameter for which the function
 has a known value, an exception.
 
-\subsection{Test Case Generation}
+\subsection{Equivalence classes for vector parameters}
+
+\subsubsection{Variables, parameters, and options}
+
+If we need to implement some matrix algorithm, then
+we might make a function that has a few arguments: the matrix of data, algorithm parameters
+to control cutoffs in the algorithm, and options to determine whether
+the result is written back into the source matrix memory.
+The data, algorithm parameters, and options are all, in the eyes of unit testing,
+parameters.
+
+These three kinds of parameters, however, tend to affect functions
+differently. Options appear in the test of if--thens, so they change
+the code path. The code path is the sequence of blocks of code that execute
+for a particular set of parameters.
+Algorithm parameters tend to appear in key equations, so that they
+affect data flow in a function. The data flow is a graph
+of which values in a function depend on which previous values.
+The input matrix, itself, is effectively a two-dimensional matrix of
+parameters, greatly increasing the number of possible inputs to a function.
+
+\subsection{Example}\label{sec:parameter-wilson}
+This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
+
+This function finds standard error from effective sample size for two
+different models. One is the binomial model, denoted ``proportion,''
+and the other is a demographic rate, denoted ``rate,'' which is not bounded
+by 1. For the binomial model, the Wilson score interval is
+\begin{equation}
+    \frac{\hat{p}+z^2/2n\pm z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
+\end{equation}
+where $z=z_{\alpha/2}$, so it's .975 for a $95\:\%$~confidence interval.
+I think it will translate between confidence interval and standard
+error by assuming asymptotic normality, which means assuming the
+confidence interval is
+\begin{equation}
+    p\pm z \times\mbox{standard error}.
+\end{equation}
+This means a standard error from Wilson's score interval comes from
+\begin{eqnarray}
+    z \times\mbox{standard error} & = & \frac{z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n} \\
+    \mbox{standard error} & = & \frac{\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
+\end{eqnarray}
+
+For the standard error of a rate, there are two calculations, an asymptotic one
+for large effective sample size and another for small effective sample size.
+For large sample sizes, standard error is $\sqrt{\lambda/n}$, as expected for Poisson
+rates. For small sample sizes, this code uses a linear interpolation between two values,
+which are the large sample size value, pinned to $\lambda n=5$, and the value $1/n$.
+\begin{equation}
+    \left(1-\frac{\lambda n}{5}\right) \frac{1}{n} + \left(\frac{\lambda n}{5}\right)\sqrt{\frac{5/n}{n}}.
+\end{equation}
+A larger selection of standard estimators for Poisson rates is in \citet{patil2012}.
+
+%https://stash.ihme.washington.edu/projects/CC/repos/cascade_ode/browse/cascade_ode/drill.py
+\begin{lstlisting}[language=Python]
+def se_from_ess(p, ess, param_type, cases=None,
+                quantile=0.975):
+    """ Calculates standard error from effective sample size
+    and mean based on the Wilson Score Interval """
+
+    err_msg = ("param_type must be either "
+               "'proportion' or 'rate'")
+    assert param_type in ['proportion', 'rate'], err_msg
+
+    if cases is None:
+        cases = p * ess
+
+    if ess == 0:
+        return 0
+
+    if param_type == "proportion":
+        z = stats.norm.ppf(quantile)
+        se = np.sqrt(p * (1 - p) / ess + z**2 / (4 * ess**2))
+    elif cases <= 5:
+        # Use linear interpolation for rate parameters
+        # with fewer than 5 cases
+        se = ((5 - p * ess) / ess + p *
+              ess * np.sqrt(5 / ess**2)) / 5
+    elif cases > 5:
+        # Use Poisson SE for rate parameters with more than
+        # 5 cases
+        se = np.sqrt(p / ess)
+    else:
+        raise Exception(
+            "Can't calculate SE... check your cases parameter")
+
+    return se
+\end{lstlisting}
+
+\begin{center}
+    \begin{tabular}{ll}
+    \hline
+    Variable & Possible Values \\ \hline
+    mean $p$ & $p<0$, $0<p<1$, $p=0$, $p>1$, single value or array \\
+    effective sample size $e_{ss}$ & $e_{ss} <0$, $0<e_{ss}<p/5$, $e_{ss}>p/5$ \\
+    param type & proportion, rate, other \\
+    cases & missing, None, negative, $<5$, $5$, $>5$ \\
+    quantile & missing, $0<q<1$, $q=1$, $q>1$ \\ \hline
+    \end{tabular}
+\end{center}
+The decision table will be quite large, but we can start with some
+particular values.
+\begin{center}
+    \begin{tabular}{llllll}
+    \hline
+    mean & ess & param type & cases & quantile & result \\ \hline
+    0.04 & 100 & rate & missing & 30 & $0.02$ \\
+    0.04 & 100 & None & missing & missing & assertion \\
+    0.04 & 0 & rate & missing & missing & 0 \\
+    (0.04, 0.01) & (0, 0) & rate & missing & missing & (0, 0)
+\end{tabular}
+\end{center}
+
+This function is written to handle an array of mean values.
+If the input mean is an array of numbers and the standard error
+is zero, the output of the function is a single zero, not an array
+of zeroes.
+
+
+\subsection{Test case generation}
 When we decide to use test-driven design, we start each bout of
 coding by writing a test that mimics user input, and then we write
 code until the application responds correctly to the user.
@@ -1095,7 +1215,7 @@ these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
 and the \textsc{act} library~\citep{kuhn2008automated}.
 
 
-\subsubsection{All Other Methods}
+\subsubsection{All other methods}
 The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
 are yet another way to generate tests that span the space of
 all possible parameters~\citep{Owen1992}.
@@ -1105,104 +1225,6 @@ do user-level testing on scientific code.
 \citet{petke2015practical} cover these strategies in their book,
 and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
 
-
-\subsection{Example}\label{sec:parameter-wilson}
-This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
-
-This function finds standard error from effective sample size for two
-different models. One is the binomial model, denoted ``proportion,''
-and the other is a demographic rate, denoted ``rate,'' which is not bounded
-by 1. For the binomial model, the Wilson score interval is
-\begin{equation}
-    \frac{\hat{p}+z^2/2n\pm z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
-\end{equation}
-where $z=z_{\alpha/2}$, so it's .975 for a $95\:\%$~confidence interval.
-I think it will translate between confidence interval and standard
-error by assuming asymptotic normality, which means assuming the
-confidence interval is
-\begin{equation}
-    p\pm z \times\mbox{standard error}.
-\end{equation}
-This means a standard error from Wilson's score interval comes from
-\begin{eqnarray}
-    z \times\mbox{standard error} & = & \frac{z\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n} \\
-    \mbox{standard error} & = & \frac{\sqrt{\frac{\hat{p}(1-\hat{p})+z^2/4n}{n}}}{1+z^2/n}
-\end{eqnarray}
-
-For the standard error of a rate, there are two calculations, an asymptotic one
-for large effective sample size and another for small effective sample size.
-For large sample sizes, standard error is $\sqrt{\lambda/n}$, as expected for Poisson
-rates. For small sample sizes, this code uses a linear interpolation between two values,
-which are the large sample size value, pinned to $\lambda n=5$, and the value $1/n$.
-\begin{equation}
-    \left(1-\frac{\lambda n}{5}\right) \frac{1}{n} + \left(\frac{\lambda n}{5}\right)\sqrt{\frac{5/n}{n}}.
-\end{equation}
-A larger selection of standard estimators for Poisson rates is in \citet{patil2012}.
-
-%https://stash.ihme.washington.edu/projects/CC/repos/cascade_ode/browse/cascade_ode/drill.py
-\begin{lstlisting}[language=Python]
-def se_from_ess(p, ess, param_type, cases=None,
-                quantile=0.975):
-    """ Calculates standard error from effective sample size
-    and mean based on the Wilson Score Interval """
-
-    err_msg = ("param_type must be either "
-               "'proportion' or 'rate'")
-    assert param_type in ['proportion', 'rate'], err_msg
-
-    if cases is None:
-        cases = p * ess
-
-    if ess == 0:
-        return 0
-
-    if param_type == "proportion":
-        z = stats.norm.ppf(quantile)
-        se = np.sqrt(p * (1 - p) / ess + z**2 / (4 * ess**2))
-    elif cases <= 5:
-        # Use linear interpolation for rate parameters
-        # with fewer than 5 cases
-        se = ((5 - p * ess) / ess + p *
-              ess * np.sqrt(5 / ess**2)) / 5
-    elif cases > 5:
-        # Use Poisson SE for rate parameters with more than
-        # 5 cases
-        se = np.sqrt(p / ess)
-    else:
-        raise Exception(
-            "Can't calculate SE... check your cases parameter")
-
-    return se
-\end{lstlisting}
-
-\begin{center}
-    \begin{tabular}{ll}
-    \hline
-    Variable & Possible Values \\ \hline
-    mean $p$ & $p<0$, $0<p<1$, $p=0$, $p>1$, single value or array \\
-    effective sample size $e_{ss}$ & $e_{ss} <0$, $0<e_{ss}<p/5$, $e_{ss}>p/5$ \\
-    param type & proportion, rate, other \\
-    cases & missing, None, negative, $<5$, $5$, $>5$ \\
-    quantile & missing, $0<q<1$, $q=1$, $q>1$ \\ \hline
-    \end{tabular}
-\end{center}
-The decision table will be quite large, but we can start with some
-particular values.
-\begin{center}
-    \begin{tabular}{llllll}
-    \hline
-    mean & ess & param type & cases & quantile & result \\ \hline
-    0.04 & 100 & rate & missing & 30 & $0.02$ \\
-    0.04 & 100 & None & missing & missing & assertion \\
-    0.04 & 0 & rate & missing & missing & 0 \\
-    (0.04, 0.01) & (0, 0) & rate & missing & missing & (0, 0)
-\end{tabular}
-\end{center}
-
-This function is written to handle an array of mean values.
-If the input mean is an array of numbers and the standard error
-is zero, the output of the function is a single zero, not an array
-of zeroes.
 
 \subsection{Conclusion}
 If you can separate parameter handling from the rest of the code,
@@ -1216,8 +1238,8 @@ Think of parameter-handling as translation from an external
 
 
 
-\section{Parallel Implementation}\label{sec:parallel-implementation}
-\subsection{Write it Twice}\label{sec:parallel-twice}
+\section{Parallel implementation}\label{sec:parallel-implementation}
+\subsection{Write it twice}\label{sec:parallel-twice}
 Read through unit tests, and they all have the same form.
 They set up data and parameters to pass to a function, call the
 function, and either compare its output to some known answer or to
@@ -1441,7 +1463,7 @@ the code, but mid-level functions will change less frequently,
 and there's a chance to guess why they changed.
 
 
-\subsection{Testing the compiler}\label{sec:test-compiler}
+\subsection{Checkout testing}\label{sec:test-compiler}
 
 Let's say you have a cluster of computers. They are all Intel machines,
 but they come from different years. They could be different architectures
@@ -1610,7 +1632,7 @@ in floating-point math.
 
 
 
-\section{Statistics for Testing}\label{sec:statistical}
+\section{Statistics for testing}\label{sec:statistical}
 
 \subsection{Randomized calculations should give different answers each time}
 
@@ -2082,7 +2104,7 @@ functions will be copied into other projects, translated
 to other languages. They will exist long beyond the work
 that has your name.
 
-\section{Further Reading}\label{sec:further-reading}
+\section{Further reading}\label{sec:further-reading}
 
 The most complete books on general software testing offer a sound
 basis for testing any kind of code. I recommend starting with
@@ -2102,53 +2124,6 @@ construction of code, as well as testing. These are some recent highlights:
 	\item ``Testing Scientific Software: A Systematic Literature Review,''~\cite{kanewala2014}.
 	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
 \end{itemize}
-
-\appendix
-
-\section{Faults in Mathematical Code}\label{sec:faults-and-failures}
-
-For each section, ask what faults does this technique limit?
-For instance, using a limit test for constant-mortality mean age
-ensures you don't have a numerical fault.
-
-\subsection{Fault versus Failure}
-Jorgensen's \emph{Software Testing: A Craftsman's Approach} distinguishes
-faults from failures~\citep{jorgensen2013}.
-A fault is the characters that were typed
-incorrectly. A failure is observation that something went wrong.
-For instance, there may be a fault that 0.3 is assigned to an integer
-instead of assigning it to a double. The failure will happen later,
-in the code that divides $1 / 0$.
-
-Any failure is a problem. We don't want to throw exceptions or segfault.
-Worse for mathematical code is when an error in the code isn't visible
-but does give a wrong answer.
-The worst problem is faults that aren't failures.
-
-
-\subsection{Classes of Faults}
-Jorgensen gives a set of fault categories and examples, elided here:
-\begin{itemize}
-    \item Input/Output - incorrect input accepted, incomplete result
-    \item Logic - missing cases, test of wrong variable
-    \item Computation - incorrect algorithm, parenthesis error
-    \item Interface - parameter mismatch, call to wrong procedure
-    \item Data - Incorrect type, wrong data, off by one
-\end{itemize}
-These all apply and, yes, read Jorgensen, but most of this article 
-expands upon a single category of fault: incorrect algorithm.
-
-This document covers two different kinds of failure-free faults.
-\begin{itemize}
-\item Simple data manipulation that doesn't do what the user
-   expected it to do.
-   
-\item Mathematical functions that return a result that looks
-   reasonable but isn't correct.
-\end{itemize}
-While these faults are within the taxonomy of faults
-in any book on testing, we can discuss some of the particular
-challenges that complicated mathematical functions introduce.
 
 \bibliography{tsci}
 \end{document}

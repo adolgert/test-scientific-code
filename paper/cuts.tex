@@ -1,0 +1,45 @@
+
+\section{Faults in Mathematical Code}\label{sec:faults-and-failures}
+
+For each section, ask what faults does this technique limit?
+For instance, using a limit test for constant-mortality mean age
+ensures you don't have a numerical fault.
+
+\subsection{Fault versus Failure}
+Jorgensen's \emph{Software Testing: A Craftsman's Approach} distinguishes
+faults from failures~\citep{jorgensen2013}.
+A fault is the characters that were typed
+incorrectly. A failure is observation that something went wrong.
+For instance, there may be a fault that 0.3 is assigned to an integer
+instead of assigning it to a double. The failure will happen later,
+in the code that divides $1 / 0$.
+
+Any failure is a problem. We don't want to throw exceptions or segfault.
+Worse for mathematical code is when an error in the code isn't visible
+but does give a wrong answer.
+The worst problem is faults that aren't failures.
+
+
+\subsection{Classes of Faults}
+Jorgensen gives a set of fault categories and examples, elided here:
+\begin{itemize}
+    \item Input/Output - incorrect input accepted, incomplete result
+    \item Logic - missing cases, test of wrong variable
+    \item Computation - incorrect algorithm, parenthesis error
+    \item Interface - parameter mismatch, call to wrong procedure
+    \item Data - Incorrect type, wrong data, off by one
+\end{itemize}
+These all apply and, yes, read Jorgensen, but most of this article 
+expands upon a single category of fault: incorrect algorithm.
+
+This document covers two different kinds of failure-free faults.
+\begin{itemize}
+\item Simple data manipulation that doesn't do what the user
+   expected it to do.
+   
+\item Mathematical functions that return a result that looks
+   reasonable but isn't correct.
+\end{itemize}
+While these faults are within the taxonomy of faults
+in any book on testing, we can discuss some of the particular
+challenges that complicated mathematical functions introduce.
