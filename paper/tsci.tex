@@ -837,49 +837,20 @@ mirror important properties of the math we want it to represent,
 even though it will always remain a fundamentally different function.
 
 
-\section{Testing by classes of parameters}\label{sec:parameter-logic}
-
-When our expectations reduce to a rule: if I send this in, then it
-sends that back.
-
+\section{Choosing parameter values to test}\label{sec:parameter-logic}
 
 \subsection{Decision tables}\label{sec:parameter-decision}
 
-Given that scientific functions have large spaces of possible inputs,
-we have to choose which parameters and parameter
-combinations to test, and we limit the tests by identifying
-parameter values that are nearly-the-same test. For instance,
-if a function calculates age-standardized mortality rate, then testing
-the case where the mortality rate is 1.1 times larger hardly seems
-a different test. Instead, we might ask how the function handles
-missing values, zero values, or unusually sharp rises or falls in
-mortality rate. Sets of parameters that probe the same faults in
-the function under test are called \emph{equivalent.}
+A unit test usually starts with some setup of variables and
+parameters. This can be complicated. Then comes the moment it
+calls the function-under-test with those parameters. Finally,
+it checks the result. Let's say we can figure out what the result
+should be, for any set of input parameters. We can talk later about
+when this is possible, and when it isn't.
 
-% This is called Partition testing
-% You split by functionality, specification, requirements,
-% or you split by statement coverage, code coverage, branch coverage.
-% 
-% If everything in a partition fails, it is "homogeneous."
-Methods to test parameter logic all have the same underpinning,
-that they will try to test at least one set of parameters from
-each of the equivalence classes of inputs. Deciding what is an
-equivalence class can be difficult. Sometimes two parameters
-sets are equivalent in terms of the mathematical statement of 
-the model, but their representation in code makes one set
-have a different risk from another. For instance, a function of small
-values would be well-defined as an equation, but it could cause
-denormalization when written in code.
-It can also be the other way around, that
-the mathematical statement of a model makes clear what parameter
-sets may be equivalent. Information from both statements of
-a function will be helpful.
-
-A decision table is a list of parameters and the expected result
-of the function, arranged with one unit test per row. The
-tests can exhaust all possible parameter combinations or
-can have a row per equivalence class, when the number of combinations
-becomes large.
+A decision table is a set of unit tests, one per row,
+with a column for each parameter choice and a column
+for the expected result.
 
 For instance, consider a function that projects a time series
 using the trend of its running average. It could use the slope
@@ -901,7 +872,32 @@ The clear table is pleasing, but we can see that, even for
 this small case, the list will be long. The example
 above doesn't even begin to probe error conditions, such
 as negative $m$ values or $m$ greater than the length
-of the data. We might define equivalence classes for each
+of the data.
+
+
+\subsection{Equivalence classes}\label{sec:limits}
+
+% This is called Partition testing
+% You split by functionality, specification, requirements,
+% or you split by statement coverage, code coverage, branch coverage.
+% 
+% If everything in a partition fails, it is "homogeneous."
+Methods to test parameter logic all have the same underpinning,
+that they will try to test at least one set of parameters from
+each of the equivalence classes of inputs. Deciding what is an
+equivalence class can be difficult. Sometimes two parameters
+sets are equivalent in terms of the mathematical statement of 
+the model, but their representation in code makes one set
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
+the mathematical statement of a model makes clear what parameter
+sets may be equivalent. Information from both statements of
+a function will be helpful.
+
+
+We might define equivalence classes for each
 parameter, such as these.
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
@@ -937,9 +933,17 @@ equivalent inputs. If we used these five, then the total
 number of tests above would be $60\times 6 = 360$.
 
 
-\subsection{Parameter equivalence}\label{sec:limits}
+Given that scientific functions have large spaces of possible inputs,
+we have to choose which parameters and parameter
+combinations to test, and we limit the tests by identifying
+parameter values that are nearly-the-same test. For instance,
+if a function calculates age-standardized mortality rate, then testing
+the case where the mortality rate is 1.1 times larger hardly seems
+a different test. Instead, we might ask how the function handles
+missing values, zero values, or unusually sharp rises or falls in
+mortality rate. Sets of parameters that probe the same faults in
+the function under test are called \emph{equivalent.}
 
-\subsection{Equivalence classes}
 
 What would it mean to test all possible parameters?
 What would it mean to test all possible failures?

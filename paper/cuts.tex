@@ -1,4 +1,24 @@
 
+
+
+Our attention shifts to asking, which parameter sets should I test
+for this function? Which parameter sets are meaningfully different
+test? How do I know when I've tested enough of them?
+
+
+\section{disaggregating function}
+
+We could be testing a function where we know what answer it should
+give. For instance, take a function which disaggregates its input
+vector into finer bins.
+\begin{lstlisting}
+function disaggregate(coarse, coarse_bins, fine_bins)
+\end{lstlisting}
+For the unit test, we can create a smooth-enough function on
+the fine bins, aggregate it to the coarse bins, and use
+that as our known input.
+
+
 \section{Faults in Mathematical Code}\label{sec:faults-and-failures}
 
 For each section, ask what faults does this technique limit?
