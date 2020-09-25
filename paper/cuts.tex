@@ -1,5 +1,42 @@
 
 
+I have written unit tests without thinking about how I chose
+what to test. Foremost in my mind is risk, which I estimate
+from how likely something is to go wrong, how bad it will be,
+and how hard it is to mitigate. That's the first two steps
+of choosing unit tests.
+
+
+
+Methods to test parameter logic all have the same underpinning,
+that they will try to test at least one set of parameters from
+each of the equivalence classes of inputs. Deciding what is an
+equivalence class can be difficult. Sometimes two parameters
+sets are equivalent in terms of the mathematical statement of 
+the model, but their representation in code makes one set
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
+the mathematical statement of a model makes clear what parameter
+sets may be equivalent. Information from both statements of
+a function will be helpful.
+
+Not every parallel implementation is a brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
 
 Our attention shifts to asking, which parameter sets should I test
 for this function? Which parameter sets are meaningfully different

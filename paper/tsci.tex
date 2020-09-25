@@ -841,76 +841,156 @@ even though it will always remain a fundamentally different function.
 
 \subsection{Decision tables}\label{sec:parameter-decision}
 
-A unit test usually starts with some setup of variables and
-parameters. This can be complicated. Then comes the moment it
-calls the function-under-test with those parameters. Finally,
-it checks the result. Let's say we can figure out what the result
-should be, for any set of input parameters. We can talk later about
-when this is possible, and when it isn't.
+A unit test is all about what parameters go in and what result
+comes out. There is setup of variables and
+parameters, which can be complicated. Checking the result can
+require twists and turns, but unit tests reduce to parameters and
+result.
 
-A decision table is a set of unit tests, one per row,
-with a column for each parameter choice and a column
-for the expected result.
+Let's say, for our scientific code, that we can figure out what the result
+should be, for any set of input parameters. This isn't always
+possible, which is a problem we can discuss later, but assume
+for now that we have a way to know what the answer should be.
+
+Decision tables capture the clarity of what-goes-in paired
+with what-comes-out. They have one row per test with one
+column per input or output. It sounds simple, but it
+really makes code clear to use exactly that, a formatted
+table in a unit test.
 
 For instance, consider a function that projects a time series
 using the trend of its running average. It could use the slope
-of the last $m$ entries in the time series. It could weight
+of the last $m$ entries in the time series.
+\begin{lstlisting}
+def trend_predict(x, m, kernel, transform, range)
+\end{lstlisting}
+It could weight
 those last $m$ entries according to an exponential or Gaussian, so that
 earlier entries count less. It could transform the entries
-into log-space before projecting them. These options create
+into log-space before projecting them. These options
+($m$, kernel, transform, and range) create
 sets of allowed parameters.
 \begin{center}
-\begin{tabular}{|l|l|l|l|l|}\hline
-$m$ & kernel & transform & range & output \\ \hline
-5 & Gaussian & linear & 1.0 & 2.7 \\
-5 & Gaussian & logarithmic & 2.0 & 1.9 \\
-5 & exponential & linear & 3.0 & 2.8 \\
-5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
+\begin{tabular}{|l|l|l|l|l|l|}\hline
+$x$ & $m$ & kernel & transform & range & output \\ \hline
+$x_0$ & 5 & Gaussian & linear & 1.0 & 2.7 \\
+$x_0$ & 5 & Gaussian & logarithmic & 2.0 & 1.9 \\
+$x_0$ & 5 & exponential & linear & 3.0 & 2.8 \\
+$x_0$ & 5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
 \end{tabular}
 \end{center}
-The clear table is pleasing, but we can see that, even for
+We can see that, even for
 this small case, the list will be long. The example
 above doesn't even begin to probe error conditions, such
 as negative $m$ values or $m$ greater than the length
-of the data.
+of the data. For the time series itself, we could imagine
+a lot of time series that might be different in some way,
+if they were negative values or all the same value.
 
+We need to decide which parameter sets to test
+and how many are enough.
 
 \subsection{Equivalence classes}\label{sec:limits}
 
+\subsubsection{Definition}
 % This is called Partition testing
 % You split by functionality, specification, requirements,
 % or you split by statement coverage, code coverage, branch coverage.
 % 
 % If everything in a partition fails, it is "homogeneous."
-Methods to test parameter logic all have the same underpinning,
-that they will try to test at least one set of parameters from
-each of the equivalence classes of inputs. Deciding what is an
-equivalence class can be difficult. Sometimes two parameters
-sets are equivalent in terms of the mathematical statement of 
-the model, but their representation in code makes one set
-have a different risk from another. For instance, a function of small
-values would be well-defined as an equation, but it could cause
-denormalization when written in code.
-It can also be the other way around, that
-the mathematical statement of a model makes clear what parameter
-sets may be equivalent. Information from both statements of
-a function will be helpful.
 
+The tools we discuss here will help us with the three steps
+we take to choose which parameters to test.
 
-We might define equivalence classes for each
-parameter, such as these.
+\begin{enumerate}
+  \item Define which parameters could break the function in different ways.
+
+  \item Assign a probability to each set of parameters.
+
+  \item hoose an order in which to test some, or all, of those
+   parameters.
+\end{enumerate}
+
+\noindent{}These three steps will help us focus our testing
+where we see the most risk, and they start with identifying
+equivalence classes.
+
+Equivalence classes are sets of parameters that test the same
+parts of the function. If one of them would find a failure,
+then another in the same equivalence class would find the same
+failure. That's a reasonable way to partition test parameters
+and impossible to do in practice.
+
+We could ensure that each line of code in the function is
+run by at least one unit test. That's called statement coverage.
+We could further fine-grain that to ensure that every branch
+in the code is taken by at least one unit test. That's
+branch coverage. Both of these are kinds of code coverage.
+They're both incomplete representations of equivalence classes
+in code and, in practice, we often think only of statement
+coverage.
+
+Take the example above, and list equivalence classes for each parameter.
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
-parameter & \# cases & cases \\
+parameter & \# classes & classes \\
+$x$ & 5 & positive, non-positive, constant, linear, very noisy \\
 $m$ & 5 & negative, 0, less than data, equal to data, more than data \\
 kernel & 2 & Gaussian, exponential \\
-range & 3 & negative, 0, positive \\
+range & 4 & negative, 0, positive, longer than $x$ \\
 transform & 2 & linear, logarithmic \\ \hline
 \end{tabular}
 \end{center}
-That makes $5 \times 2 \times 3\times 2 = 60$ cases.
-The table also fails to mention the most important
-parameter, the vector of data values.
+That makes $5\times 5 \times 2 \times 4\times 2 = 400$ cases.
+By defining a limited number of equivalence classes for
+each parameter, we have reduce the total number of unit tests
+from infinite to 400, but that's still a lot.
+
+Our equivalence classes include edge cases. If a parameter
+is a string, edge cases are strings of length one and zero.
+If a parameter is an exponent, edge cases are $(-1, 0, 1)$,
+if we think the power of zero matters.
+
+When I choose equivalence classes, I can start by reading
+the code. Defining equivalence classes by code coverage is
+exactly the same as reading code for path dependencies.
+I can also start by reading the specification or requirements
+document, were those to exist. For scientific code,
+it can help to read the math this code represents.
+A parameter of 3.0 and 3.5 might not be equivalent if they
+represent radians. Floating-point types only make this
+more complicated.
+
+\subsubsection{Mathematical parameters}
+
+A function, like the example, has three kinds of parameters.
+The vector is data. Then there are constants for the calulation.
+Finally, there are options for the algorithm. These accrete
+as the function ages. The code sees all of these as parameters,
+and each one has equivalence classes that expand the
+number of possible tests we could do.
+Floating-point types, integers used for math, and vectors
+of both of these, all create large numbers of equivalence classes.
+
+If the function-under-test represents a math equation, then
+look to any special values for that math equation. Identify
+when a denominator can be zero. Look for values that,
+if set just right, will cancel each other out, because
+floating-point subtraction, $b-a$, can lose precision of
+$b$ and $a$ are far from zero. It's more rare, with double-precision
+floating-point types, to worry about values that are too
+large or small.
+
+An integer type can have similar trouble representing
+the integers. The Google C++ Style Guide suggests using
+signed integers instead of unsigned integers so that
+accidentally decrementing a zero value will result in an
+easier-to-find fault. Single-byte and four-byte integers
+are more common, and they can have range problems. Adding
+one to their maximum value makes them wrap around to a
+negative value. Therefore we choose edge cases that include
+minimum and maximum values, if appropriate, in addition
+to $(-1, 0, 1)$.
 
 If a parameter is a vector of numbers, what to test depends
 even more on the particular math. Some suggestions:
@@ -929,64 +1009,9 @@ even more on the particular math. Some suggestions:
     They are one way to explore the space of input arrays~\citep{Owen1992}.
 \end{enumerate}
 Each of these suggestions becomes another category for
-equivalent inputs. If we used these five, then the total
-number of tests above would be $60\times 6 = 360$.
+equivalent inputs. We whittle them to manageable numbers of
+tests by understanding some of the math and some of the code.
 
-
-Given that scientific functions have large spaces of possible inputs,
-we have to choose which parameters and parameter
-combinations to test, and we limit the tests by identifying
-parameter values that are nearly-the-same test. For instance,
-if a function calculates age-standardized mortality rate, then testing
-the case where the mortality rate is 1.1 times larger hardly seems
-a different test. Instead, we might ask how the function handles
-missing values, zero values, or unusually sharp rises or falls in
-mortality rate. Sets of parameters that probe the same faults in
-the function under test are called \emph{equivalent.}
-
-
-What would it mean to test all possible parameters?
-What would it mean to test all possible failures?
-What would it mean to test all possible faults?
-What would it mean to test all possible expectations?
-
-
-\subsubsection{Boundary values for floating point types}
-Not every parallel implementation is a brute-force retelling
-of a model. Most mathematical functions provide finger-holds
-support of their correctness.
-
-The simplest of these are parameters for which a function
-takes a known value. The function could be a mess of
-polynomials of trigonometric quantities,
-\begin{equation}
-  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
-\end{equation}
-but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
-and so on. If the function should divide by zero for some
-number, then that, too, is a parameter for which the function
-has a known value, an exception.
-
-\subsection{Equivalence classes for vector parameters}
-
-\subsubsection{Variables, parameters, and options}
-
-If we need to implement some matrix algorithm, then
-we might make a function that has a few arguments: the matrix of data, algorithm parameters
-to control cutoffs in the algorithm, and options to determine whether
-the result is written back into the source matrix memory.
-The data, algorithm parameters, and options are all, in the eyes of unit testing,
-parameters.
-
-These three kinds of parameters, however, tend to affect functions
-differently. Options appear in the test of if--thens, so they change
-the code path. The code path is the sequence of blocks of code that execute
-for a particular set of parameters.
-Algorithm parameters tend to appear in key equations, so that they
-affect data flow in a function. The data flow is a graph
-of which values in a function depend on which previous values.
-The input matrix, itself, is effectively a two-dimensional matrix of
-parameters, greatly increasing the number of possible inputs to a function.
 
 \subsection{Example}\label{sec:parameter-wilson}
 This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
