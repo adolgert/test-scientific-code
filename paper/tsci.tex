@@ -102,6 +102,8 @@ and others are particular to testing scientific code.
 % 4. Deterministic repeated measures
 % 5. Methods and motives, the process in context
 
+% finite state machine structured testing
+
 % From Mike Richards
 % 2. Focus on moving up and down the stack, not between scientist and developer.
 % You don't need to tell them everything about the subject.
@@ -907,7 +909,7 @@ we take to choose which parameters to test.
 
   \item Assign a probability to each set of parameters.
 
-  \item hoose an order in which to test some, or all, of those
+  \item Choose an order in which to test some, or all, of those
    parameters.
 \end{enumerate}
 
@@ -950,6 +952,12 @@ Our equivalence classes include edge cases. If a parameter
 is a string, edge cases are strings of length one and zero.
 If a parameter is an exponent, edge cases are $(-1, 0, 1)$,
 if we think the power of zero matters.
+
+When I identify edge cases, I'm assigning a higher probability
+to the risk associated with these parameter values. I'm
+giving them a separate equivalence class in order to ensure
+that there is some coverage of these cases. That was
+step two.
 
 When I choose equivalence classes, I can start by reading
 the code. Defining equivalence classes by code coverage is
@@ -1050,8 +1058,8 @@ A larger selection of standard estimators for Poisson rates is in \citet{patil20
 \begin{lstlisting}[language=Python]
 def se_from_ess(p, ess, param_type, cases=None,
                 quantile=0.975):
-    """ Calculates standard error from effective sample size
-    and mean based on the Wilson Score Interval """
+    """Calculates standard error from effective sample size
+    and mean based on the Wilson Score Interval"""
 
     err_msg = ("param_type must be either "
                "'proportion' or 'rate'")
@@ -1113,68 +1121,38 @@ of zeroes.
 
 
 \subsection{Test case generation}
-When we decide to use test-driven design, we start each bout of
-coding by writing a test that mimics user input, and then we write
-code until the application responds correctly to the user.
-This is a high-level test, and it's an example of a test that
-has many parameters because, for a scientific application, it
-usually corresponds to adding a user-specified option to the
-sum of the input data and configuration files. There is no
-way to try every combination of inputs, and the application
-may take a long time to run.
-
-The luxury of combining every combination of input parameters
-is called \emph{combinatorial interaction testing.} We usually
-test some fraction of these possible inputs, called the
-\emph{test coverage fraction,} not to be confused with the
-term \emph{test coverage,} that refers to the percentage of
-all code paths that are run at least once by any unit test.
-
-How we choose which, of all possible tests, to run is a question
-of test design, the same way a doctor designs a randomized
-controlled trial or a botanist chooses treatments of plants
-in a field. Let's look at how the most common choices
-address risks in the code most efficiently.
 
 
-\subsubsection{Random parameter choices}
+\subsubsection{Choices of test cases}
+There are names for various strategies to generate test cases.
+We can discuss those names, but we get to make very detailed
+choices about how we generate tests, and testing code tends
+to look hybrid, with different choices for different parameters.
 
-The hardest part of generating test cases is choosing parameters
-that will find the most failures in the shortest time. Equivalence
-classes tell you which parameters will find the same failures,
-so they tell you which tests would be redundant. Given a set
-of tests, it's better to throw out those that are redundant,
-but the work to generate tests that aren't redundant can be cumbersome.
-The work to establish equivalence classes requires care,
-and sometimes parameters that seem equivalent might generate
-different failures.
+It was a choice to decide equivalence classes. Doing a thorough
+job can take developer time without offering a lot of improvement
+over randomly choosing a parameter value. We can think of the
+random parameter value as coming from a single equivalence
+class. The values are never
+totally random, either. Nobody would test a string parameter with
+a random bit value because it would never test for a zero-length
+string.
 
-Randomized parameter generation avoids these problems. It's easier
-to generate parameters from a range or a set and to mix and match
-them at random. The tests might run longer to find a failure, but
-the tests are much faster to write, and you always know that longer
-runs have a better chance to find a failure. Every time you
-run twice as many tests, you increase the possibility of finding
-tests by fifty-percent. That's one kind of well-behaved.
+Parameters interact, too. It may be that a computational constant
+parameter isn't used at all unless a particular option is chosen.
+This can make generating parameters more tricky if they need
+to be created together, so a second step, to filter the parameter
+sets, can be easier than generating only permitted values.
 
-This doesn't mean the inputs have to be entirely random. For
-instance, if an input is a vector of numbers, it makes sense
-to randomly draw a length for the vector and then randomly
-draw each of the numbers, because using a random bit pattern
-would mean almost all vectors are near the maximum length.
-A vector that's created with a length draw is still random,
-but it's biased towards shorter vectors, because these tend
-to find faults in algorithms.
-Random parameters choices can be biased to choose more often
-those parameter sets that are more commonly used. They can
-be biased towards edge cases that might find failures. Either way,
-they are usually random with probability weights.
+When we pick a value from each parameter class, we can either
+pick a random value within that class or always pick the
+same value.
 
-Because random parameter generation is straightforward
-and predictable, it is very common and highly effective~\citep{arcuri2011random}.
-It makes most sense when unit tests don't take long to run
-and when it is possible to assign a known true answer, or trait
-of an answer, for all possible inputs.
+There are a goal strategies that guide these choices.
+These all fall under the general heading of test design,
+the same kind of test design we use to decide how
+to plant test plots of plants, or how to pick gels to
+run in a bench experiment.
 
 
 \subsubsection{Combinatorial excursions}
@@ -1189,7 +1167,42 @@ It can make sense to define several most-important baseline
 parameter sets from which to conduct combinatorial excursions.
 
 
+\subsubsection{Random coverage}
+
+If we use few equivalence classes and choose
+random values, that's called random testing. One benefit is
+that, the longer you test, the more likely you are to find
+a fault. Doubling the number of tests gives you half-as-much
+chance of finding a fault. It's common to run some number
+of random tests in the regular test suite and occasionally
+run tests overnight, just in case. It's important to control
+the random number generators for such tests, so that you don't
+see a fault once and fail to reproduce it.
+
+The random method is common and effective. It seems impossible
+that stratifying parameters using equivalence classes wouldn't
+improve testing, but there isn't a record of cases where
+it works a lot better than random testing~\citep{arcuri2011random}.
+
+
+\subsubsection{Single coverage}
+
+Separate parameter values, or combinations of parameter values,
+that should cause errors. Test each of those alone.
+Then set a goal that one representative value from each
+equivalence class shows up in at least one test.
+If the largest number of equivalence classes for any parameter
+is ten, then this can be ten unit tests.
+
+Choosing so few tests won't cover all lines of code
+and will come nowhere near covering all branches in a
+large function. Using a single-coverage strategy is about
+coverage of the parameters, not coverage of the code.
+In practice, we augment where we see risk.
+
+
 \subsubsection{All pairs}
+
 What if we could guarantee, that if we pick any two parameters
 of a function, and we pick two values for those parameters,
 that there is at least one unit test that includes that combination
@@ -1217,42 +1230,33 @@ and several papers cover algorithms~\citep{tung2000automating,pezze2008},
 there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
 
 
-\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
-The sections above all imply that there could be some way
-to emphasize which test are chosen, based on an assessment
-of which parameters carry the most risk. For instance, if
-a parameter is an option to make a copy of the input data
-before further work, it would be enough to test that exactly
-once, and not in all other parameter combinations. On
-the other hand, there may
-be certain parameter values that should be thoroughly-tested
-because they challenge the numerical precision of the algorithm.
+\subsubsection{Orthogonal arrays}
 
-The ability to prefer tests of certain sets of parameter values
-is called \emph{stratification.} That means you take any
-of the test generation methods above and give the test author
-the ability to weight which tests it should generate.
+Picture each parameter as an axis with as many marks
+on it as there are equivalence classes for that parameter.
+That's a space whose dimension is the count of parameters.
+We can choose tests that cover that space evenly, as evenly
+as possible. It's the same principle that's used for doing
+high-dimensional integration~\citep{Owen1992}.
 
-The throw out some of the generated tests is called
-\emph{filtering.} Sometimes it's easier to generate tests
-and toss useless ones than it is to generate the most-desired
-tests in the first place.
-
-Some of the more professional testing software includes
-these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
-\textsc{cts}~\citep{hartman2004problems},
-and the \textsc{act} library~\citep{kuhn2008automated}.
-
-
-\subsubsection{All other methods}
-The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
-are yet another way to generate tests that span the space of
-all possible parameters~\citep{Owen1992}.
-Whichever method you choose, it's
-good to have one of these methods available when it's time to
-do user-level testing on scientific code.
+The trouble with these orthogonal arrays is that they can
+be difficult to generate. The algorithms to make them
+are complicated and rarely included as programming libraries.
+Remember that we can choose different test generation strategies
+for subsets of parameters, and orthogonal arrays would be
+quite useful for sets of parameters that define a space of
+solutions.
 \citet{petke2015practical} cover these strategies in their book,
 and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
+
+
+\subsubsection{Automation}
+
+There are testing tools that read your code in order to
+generate tests. They then watch your code run those tests,
+watching for branches, in order to determine what tests
+to create. These dynamic symbolic execution techniques seem
+promising and are built into Microsoft's Intellitest.
 
 
 \subsection{Conclusion}

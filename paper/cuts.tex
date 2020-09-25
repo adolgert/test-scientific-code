@@ -38,6 +38,45 @@ number, then that, too, is a parameter for which the function
 has a known value, an exception.
 
 
+\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
+The sections above all imply that there could be some way
+to emphasize which test are chosen, based on an assessment
+of which parameters carry the most risk. For instance, if
+a parameter is an option to make a copy of the input data
+before further work, it would be enough to test that exactly
+once, and not in all other parameter combinations. On
+the other hand, there may
+be certain parameter values that should be thoroughly-tested
+because they challenge the numerical precision of the algorithm.
+
+The ability to prefer tests of certain sets of parameter values
+is called \emph{stratification.} That means you take any
+of the test generation methods above and give the test author
+the ability to weight which tests it should generate.
+
+The throw out some of the generated tests is called
+\emph{filtering.} Sometimes it's easier to generate tests
+and toss useless ones than it is to generate the most-desired
+tests in the first place.
+
+Some of the more professional testing software includes
+these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
+\textsc{cts}~\citep{hartman2004problems},
+and the \textsc{act} library~\citep{kuhn2008automated}.
+
+
+\subsubsection{All other methods}
+The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
+are yet another way to generate tests that span the space of
+all possible parameters~\citep{Owen1992}.
+Whichever method you choose, it's
+good to have one of these methods available when it's time to
+do user-level testing on scientific code.
+\citet{petke2015practical} cover these strategies in their book,
+and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
+
+
+
 Our attention shifts to asking, which parameter sets should I test
 for this function? Which parameter sets are meaningfully different
 test? How do I know when I've tested enough of them?
