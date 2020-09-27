@@ -1294,40 +1294,6 @@ to the program also creates focused testing.
 
 
 \section{Parallel implementation}\label{sec:parallel-implementation}
-
-\subsection{Known answer}
-\subsubsection{Argument by authority}
-From a paper. Wikipedia. Whatever.
-
-\subsubsection{Known at certain values}
-
-\subsubsection{Inverse problems}
-
-\subsection{Code it twice}
-\begin{itemize}
-    \item language
-    \item OS platform
-    \item library
-    \item compiler
-    \item hardware
-    \end{itemize}
-
-
-\subsection{Traverse math choices}
-
-\subsubsection{Form of equations}
-\subsubsection{Stage of derivation}
-\subsubsection{Representation of physical system}
-
-\subsection{Measuring closeness}
-
-Local and global measures.
-L1 norm. Least squares. Sum of absolute value.
-
-
-\subsection{Regression testing}
-Not regressive at all. This is a form of regression testing.
-
 \subsection{Write it twice}\label{sec:parallel-twice}
 Read through unit tests, and they all have the same form.
 They set up data and parameters to pass to a function, call the
@@ -1336,131 +1302,71 @@ something known about the answer. Every unit test is two
 functions, the function under test and a parable
 of that function, written into the unit test itself.
 
-Often, we're given code that has some functions that do important
-work but have too little documentation and no tests. It's easy
-to add tests, in this situation, in order to understand what
-those functions do. The tests can then tell the story of how
-to set up data for those functions and work with their output.
+The accepted standard for scientific data entry is dual data
+entry. It's unlikely that two data specialists will enter
+the same data wrong in the same way. Any less effort is
+worthy of opprobrium.
+We don't ask the same of our mathematical functions. A function
+has an internal consistency that can declare its reasonable
+implementation. Mixing a `6' with a `7' in scientific data
+would go unnoticed.
 
-An easy form of parallel implementation is the previous version
-of a function. Given the task to write code, the programmer will
-start with the simplest version that does the task, and then they
-iterate to make it better. That simplest version makes an excellent
-parallel implementation for use case testing.
+Even so, if we're doing science with code, then we're asking
+new questions, and we ask them with new functions. We don't
+expect to know what the absolute correct answer should be.
+There is a computer science idea of an oracle that could
+slice the Gordian knot of the halting problem to tell you
+what a function should return under all
+conditions~\citep{howden1986functional}. If we don't always
+know the what the exact result should be, then we have an
+oracle problem~\citep{sirer1999using}. We are mature enough,
+through our understanding of the vagaries of floating-point
+types and the errant nature of discretization of equations,
+to understand that even the most correct results are still
+only close, so having an oracle is a computer scientist's
+dream, not an ecologist's dream, a demographer's dream,
+or an epidemiologist's dream.
 
-We can find an appropriate parallel implementation for testing by
-looking at the set of choices we make when writing the original function
-and asking, at which step should the second implementation differ
-from the first.
-\cite{dahlgren2005} describe three steps to writing a function for
-scientific software, and we'll add one step before theirs.
+We may not expect an exact result of a function, given
+a set of inputs, but we will expect a function to have continuity,
+or to have bounded values, or to be close to another function.
+This section demonstrates the ways we build these expectations
+by comparison with other versions of a function. We can understand
+versions of a function by thinking about the mental steps
+we take between wanting to use a particular scientific model
+and implementing it in code.
+
+One succinct description of writing scientific software 
+lists only three steps~\citep{dahlgren2005}.
 \begin{enumerate}
-  \item Represent the mathematical model.
   \item Prepare discrete models.
   \item Translate the models into algorithms.
-  \item Code the models using programming languages.
+  \item Code the algorithms using programming languages.
 \end{enumerate}
-If only the algorithm in the code changes, then the results
-should be quite similar. If the models are discretized differently,
-then it takes more analysis to use one for testing of the other.
-Which you choose depends on the kinds of faults you think pose
-the most risk in the code.
+We could add more steps before, and after, these.
 
-The benefit, and threat to efficiency for testing, is that
-parallel implementations of a function can lead to scientific
-questions. Good unit testing strategies limit testing to the
-highest risks in the software, and that principle applies
-especially to use of parallel implementations, so let's
-look at how alternative choices probe faults in code.
+For instance, a model of a population of voles might have
+births and deaths, with a birth rate and death rate that
+depend on environmental conditions, predator conditions,
+and nutrient conditions. We could represent such a model
+with ordinary differential equations, but we could equally
+well represent it with a continuous-time, discrete-event
+simulation. These are two very different mathematical
+formulations of the same system.
 
-\begin{callout}
-\textbf{The Oracle Problem}---
-Imagine that there were some source to tell you what the answer to a function
-should be. It could be a software engineering support tool, or it could
-be your scratchwork on a notepad. This source is known as an
-oracle~\citep{howden1986functional}, and its absence for scientific code
-is the oracle problem~\citep{sirer1999using}. Despite the name, this
-is hardly a tragedy because testing methods can 
-finding simpler inputs, compare results with another implementation,
-or check properties of the function without checking the function itself.
-\end{callout}
+We're going to walk through various ways to use a second
+implementation of a function in order to test it.
+We can ask how rigorous a test is by looking at how
+thorougly it checks ranges of values and how exactly
+it predicts those values. We can ask what, about the function,
+the test confirms, by looking at where, in the steps
+of adapting a mathematical model to code, the comparison
+diverges from the function-under-test.
 
+\subsection{Known answer}
+\subsubsection{Argument by authority}
+From a paper. Wikipedia. Whatever.
 
-\subsection{Brute force numerical algorithms for comparison}
-
-Let's say we are supposed to calculate the mortality rate
-for five-year age groups from birth to eighty years old,
-for a Gompertz-Makeham mortality law. The parameters are
-$(x, \alpha, \beta, \lambda),$ intermediate values are $(\mu, S)$ and the result is ${}_nm_x$.
-\begin{eqnarray}
-  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
-  S(x) & = & \exp\left(-\lambda x - \frac{\alpha}{\beta}\left(e^{\beta x} - 1\right)\right) \\
-  {}_nm_x & = & \frac{\mu(x+n) S(x+n) - \mu(x)S(x)}{S(x) - S(x+n)}
-\end{eqnarray}
-Wherever this equation comes from, whether it be a book or a
-\textsc{png}\ in a Jira story, we can identify risks in transliterating
-these equations to code. The most likely faults are improperly grouping
-algebraic operations, mistaking signs, and forgetting terms. 
-
-We can address those risks by returning to the first step of writing
-a scientific function, which is how we represent the mathematical model.
-The equations above are the result of integrating a function that has fewer
-steps, even though it would be slower to run.
-\begin{eqnarray}
-  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
-  {}_nm_x & = &\frac{\int_{x}^{x+n}\mu(s) \exp(-\int_{x}^s\mu(a)ds)ds}{\int_{x}^{x+n}\exp(-\int_{x}^s\mu(a)ds)ds}.
-\end{eqnarray}
-The resulting ${}_nm_x$ should be the same as that above within
-machine precision, where machine precision means that we expect a drift
-of about one machine epsilon for each step of the integration. That means
-it should agree within several thousand times machine epsilon.
-
-This new version could have its own faults and its
-own corner cases, but they are unlikely to be the same faults
-as the original function. This is a tremendous improvement over
-not having such a test.
-
-There are many possible parallel implementations. For this example,
-we could make the looser assertion that the relative error of ${}_nm_x$
-to $\mu(x)$ should be less than some cutoff. It's not as strong a test,
-but it's quick to write.
-
-What to test with brute force computation, and how to brute
-force that computation, depends on risk assessment, time, and
-whether your work is to question faults in the code or faults
-in the model.
-
-
-
-\subsection{Another language or library}
-
-There is something lovely about the task of rewriting code from
-one language to another. On one side sits working code, problems
-solved. On the other is a green field for expressing it in the idioms
-of a new language. The original code is a gift, not only as a guide,
-but as a set of unit tests for the new code, but only for those
-willing to take the painful step of limiting their first translation
-to perserve structure around the riskiest functions.
-
-Most languages provide some built-in interoperability to call
-other languages. R, C++, Julia, and Python play together like hamsters
-in a habitrail. It's perfectly reasonable to keep code from
-a different language in with the suite of unit tests and to
-call those functions when the interoperability is available.
-
-Testing across languages, or in the same language on different
-operating systems, can probe a unique set of problems. Data types
-change, revealing limits to numerical accuracy and inappropriate
-assumptions about data structure. Libraries change, the ones that
-provide special functions or system services. For instance, the
-generalized inverse in Python will return a different value
-from the generalized inverse in R. When this breaks tests, it
-clarifies which, of the four kinds of generalized inverse,
-the code needed, and that there should be a test to see which
-is available.
-
-
-\subsection{A figure in a paper}
 If you read about an algorithm in a paper, and that paper has a table or figure,
 you could check your results against the values in the table or figure.
 Fig.~\ref{fig:wilson_chart} shows a chart from a paper. The unit test
@@ -1529,31 +1435,47 @@ test_that("paper numbers match computed", {
     \label{fig:wilson_chart}
 \end{figure}
 
-\subsection{Regression tests}
-A regression test compares the result of a function against a previous
-result from that function. The parallel implementation, in this case,
-is the previous version of the same function.
 
-There is a book called \emph{Release It!} that says we should
-``make regression testing easy,''~\citep{nygard2018release}. It's hard to make it easy
-because unit tests are built to test, not save output. Even if
-they save output from functions, it takes work to figure out
-\emph{how} a result changed if it did change. If the result
-is a data frame, did every value change, or some subset?
+\subsubsection{Known at certain values}
 
-While following the book's advice is a research project,
-it's a good focus for any particular project to find places in the
-code where regression tests would be most informative. Unit tests are
-most absolute in their pronouncement when they test the simplest
-functions. It's the mid-level functions, that do more work
-and produce the more complex output, that benefit from regression.
-The high-level functions will change output every time you touch
-the code, but mid-level functions will change less frequently,
-and there's a chance to guess why they changed.
+\subsubsection{Inverse problems}
 
+\subsection{Code it twice}
+\begin{itemize}
+    \item language
+    \item OS platform
+    \item library
+    \item compiler
+    \item hardware
+    \end{itemize}
 
-\subsection{Checkout testing}\label{sec:test-compiler}
+\subsubsection{Language}
+There is something lovely about the task of rewriting code from
+one language to another. On one side sits working code, problems
+solved. On the other is a green field for expressing it in the idioms
+of a new language. The original code is a gift, not only as a guide,
+but as a set of unit tests for the new code, but only for those
+willing to take the painful step of limiting their first translation
+to perserve structure around the riskiest functions.
 
+Most languages provide some built-in interoperability to call
+other languages. R, C++, Julia, and Python play together like hamsters
+in a habitrail. It's perfectly reasonable to keep code from
+a different language in with the suite of unit tests and to
+call those functions when the interoperability is available.
+
+Testing across languages, or in the same language on different
+operating systems, can probe a unique set of problems. Data types
+change, revealing limits to numerical accuracy and inappropriate
+assumptions about data structure. Libraries change, the ones that
+provide special functions or system services. For instance, the
+generalized inverse in Python will return a different value
+from the generalized inverse in R. When this breaks tests, it
+clarifies which, of the four kinds of generalized inverse,
+the code needed, and that there should be a test to see which
+is available.
+
+\subsubsection{Testing the chip architecture}
 Let's say you have a cluster of computers. They are all Intel machines,
 but they come from different years. They could be different architectures
 or just different steppings of the \cpu, which is the least difference
@@ -1613,6 +1535,104 @@ different conditions, but tests for scientific code can be lengthy,
 which makes it worth considering automatically reordering tests
 so that those that are most sensitive to correctness run by 
 themselves, or run first~\cite{yoo2012regression}.
+\subsection{Traverse math choices}
+
+\subsubsection{Form of equations}
+Same distribution with different parameterization.
+
+\subsubsection{Stage of derivation}
+
+
+Let's say we are supposed to calculate the mortality rate
+for five-year age groups from birth to eighty years old,
+for a Gompertz-Makeham mortality law. The parameters are
+$(x, \alpha, \beta, \lambda),$ intermediate values are $(\mu, S)$ and the result is ${}_nm_x$.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  S(x) & = & \exp\left(-\lambda x - \frac{\alpha}{\beta}\left(e^{\beta x} - 1\right)\right) \\
+  {}_nm_x & = & \frac{\mu(x+n) S(x+n) - \mu(x)S(x)}{S(x) - S(x+n)}
+\end{eqnarray}
+Wherever this equation comes from, whether it be a book or a
+\textsc{png}\ in a Jira story, we can identify risks in transliterating
+these equations to code. The most likely faults are improperly grouping
+algebraic operations, mistaking signs, and forgetting terms. 
+
+We can address those risks by returning to the first step of writing
+a scientific function, which is how we represent the mathematical model.
+The equations above are the result of integrating a function that has fewer
+steps, even though it would be slower to run.
+\begin{eqnarray}
+  \mu(x) & =&  \alpha e^{\beta x} + \lambda \\
+  {}_nm_x & = &\frac{\int_{x}^{x+n}\mu(s) \exp(-\int_{x}^s\mu(a)ds)ds}{\int_{x}^{x+n}\exp(-\int_{x}^s\mu(a)ds)ds}.
+\end{eqnarray}
+The resulting ${}_nm_x$ should be the same as that above within
+machine precision, where machine precision means that we expect a drift
+of about one machine epsilon for each step of the integration. That means
+it should agree within several thousand times machine epsilon.
+
+This new version could have its own faults and its
+own corner cases, but they are unlikely to be the same faults
+as the original function. This is a tremendous improvement over
+not having such a test.
+
+There are many possible parallel implementations. For this example,
+we could make the looser assertion that the relative error of ${}_nm_x$
+to $\mu(x)$ should be less than some cutoff. It's not as strong a test,
+but it's quick to write.
+
+What to test with brute force computation, and how to brute
+force that computation, depends on risk assessment, time, and
+whether your work is to question faults in the code or faults
+in the model.
+
+
+\subsubsection{Representation of physical system}
+
+\subsection{Measuring closeness}
+
+Local and global measures.
+L1 norm. Least squares. Sum of absolute value.
+
+
+\subsection{Regression tests}
+Not regressive at all. This is a form of regression testing.
+
+A regression test compares the result of a function against a previous
+result from that function. The parallel implementation, in this case,
+is the previous version of the same function.
+
+
+An easy form of parallel implementation is the previous version
+of a function. Given the task to write code, the programmer will
+start with the simplest version that does the task, and then they
+iterate to make it better. That simplest version makes an excellent
+parallel implementation for use case testing.
+
+There is a book called \emph{Release It!} that says we should
+``make regression testing easy,''~\citep{nygard2018release}. It's hard to make it easy
+because unit tests are built to test, not save output. Even if
+they save output from functions, it takes work to figure out
+\emph{how} a result changed if it did change. If the result
+is a data frame, did every value change, or some subset?
+
+While following the book's advice is a research project,
+it's a good focus for any particular project to find places in the
+code where regression tests would be most informative. Unit tests are
+most absolute in their pronouncement when they test the simplest
+functions. It's the mid-level functions, that do more work
+and produce the more complex output, that benefit from regression.
+The high-level functions will change output every time you touch
+the code, but mid-level functions will change less frequently,
+and there's a chance to guess why they changed.
+
+The benefit, and threat to efficiency for testing, is that
+parallel implementations of a function can lead to scientific
+questions. Good unit testing strategies limit testing to the
+highest risks in the software, and that principle applies
+especially to use of parallel implementations, so let's
+look at how alternative choices probe faults in code.
+
+
 
 \section{Testing traits of a function}
 
