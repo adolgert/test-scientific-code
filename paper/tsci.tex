@@ -14,6 +14,9 @@
 }
 \urlstyle{same}
 
+\usepackage{imakeidx}
+\makeindex
+
 \usepackage{xspace}
 \usepackage[utf8]{inputenc}
 \usepackage{fontspec}
@@ -841,7 +844,7 @@ even though it will always remain a fundamentally different function.
 
 \section{Choosing parameter values to test}\label{sec:parameter-logic}
 
-\subsection{Decision tables}\label{sec:parameter-decision}
+\subsection{Decision tables}\label{sec:parameter-decision}\index{decision table}
 
 A unit test is all about what parameters go in and what result
 comes out. There is setup of variables and
@@ -892,7 +895,7 @@ if they were negative values or all the same value.
 We need to decide which parameter sets to test
 and how many are enough.
 
-\subsection{Equivalence classes}\label{sec:limits}
+\subsection{Equivalence classes}\label{sec:limits}\index{equivalence class}
 
 \subsubsection{Definition}
 % This is called Partition testing
@@ -948,7 +951,7 @@ By defining a limited number of equivalence classes for
 each parameter, we have reduce the total number of unit tests
 from infinite to 400, but that's still a lot.
 
-Our equivalence classes include edge cases. If a parameter
+Our equivalence classes include edge cases\index{edge case}. If a parameter
 is a string, edge cases are strings of length one and zero.
 If a parameter is an exponent, edge cases are $(-1, 0, 1)$,
 if we think the power of zero matters.
@@ -990,7 +993,7 @@ floating-point types, to worry about values that are too
 large or small.
 
 An integer type can have similar trouble representing
-the integers. The Google C++ Style Guide suggests using
+the integers. The Google \cpp Style Guide suggests using
 signed integers instead of unsigned integers so that
 accidentally decrementing a zero value will result in an
 easier-to-find fault. Single-byte and four-byte integers
@@ -1022,10 +1025,10 @@ tests by understanding some of the math and some of the code.
 
 
 \subsection{Example}\label{sec:parameter-wilson}
-This should use Wilson's Score Interval to guess standard error for a measurement~\citep{agresti1998approximate}.
+This should use Wilson's Score Interval\index{Wilson's score interval} to guess standard error for a measurement~\citep{agresti1998approximate}.
 
 This function finds standard error from effective sample size for two
-different models. One is the binomial model, denoted ``proportion,''
+different models. One is the binomial\index{binomial model} model, denoted ``proportion,''
 and the other is a demographic rate, denoted ``rate,'' which is not bounded
 by 1. For the binomial model, the Wilson score interval is
 \begin{equation}
@@ -1045,8 +1048,8 @@ This means a standard error from Wilson's score interval comes from
 \end{eqnarray}
 
 For the standard error of a rate, there are two calculations, an asymptotic one
-for large effective sample size and another for small effective sample size.
-For large sample sizes, standard error is $\sqrt{\lambda/n}$, as expected for Poisson
+for large effective\index{effective sample size} sample size and another for small effective sample size.
+For large sample sizes, standard\index{standard error} error is $\sqrt{\lambda/n}$, as expected for Poisson
 rates. For small sample sizes, this code uses a linear interpolation between two values,
 which are the large sample size value, pinned to $\lambda n=5$, and the value $1/n$.
 \begin{equation}
@@ -1159,7 +1162,7 @@ run in a bench experiment.
 If you decide that there is some most-common way to call
 the function, set that as the baseline. Then loop over parameters,
 trying all equivalence classes for each one. Then loop over pairs of parameters. Then sets of three. You define a limiting depth,
-where the full combinatorial excursion is the case where the
+where the full combinatorial\index{combinatorial design} excursion is the case where the
 limiting depth is the number of parameters.
 
 These tests would be highly-biased towards that baseline parameter set.
@@ -1170,7 +1173,7 @@ parameter sets from which to conduct combinatorial excursions.
 \subsubsection{Random coverage}
 
 If we use few equivalence classes and choose
-random values, that's called random testing. One benefit is
+random values, that's called random\index{random testing} testing. One benefit is
 that, the longer you test, the more likely you are to find
 a fault. Doubling the number of tests gives you half-as-much
 chance of finding a fault. It's common to run some number
@@ -1185,7 +1188,7 @@ improve testing, but there isn't a record of cases where
 it works a lot better than random testing~\citep{arcuri2011random}.
 
 
-\subsubsection{All values}
+\subsubsection{All values}\index{all values}
 
 Separate parameter values, or combinations of parameter values,
 that should cause errors. Test each of those alone.
@@ -1206,7 +1209,7 @@ In practice, we augment where we see risk.
 What if we could guarantee, that if we pick any two parameters
 of a function, and we pick two values for those parameters,
 that there is at least one unit test that includes that combination
-of parameters? This is the all-pairs test design, to test
+of parameters? This is the all-pairs\index{all pairs} test design, to test
 every possible pairwise interaction among parameters.
 It packs these into as few tests as possible. For instance,
 the same unit test might be the only time that pair
@@ -1216,7 +1219,7 @@ pairwise interaction appeared in the same test.
 All-pairs testing offers a feeling of completeness while
 using many fewer tests than even a depth-2 combinatorial
 excursion. There are claims that all-pairs testing almost
-always finds every fault in a function that full combinatorial
+always finds every fault in a function that full combinatorial\index{combinatorial design}
 excursions would fine~\citep{Pairwise}. It does not, however,
 do any better a job than the randomized testing of emphasizing
 particular parameter sets that the author decides carry
@@ -1230,7 +1233,7 @@ and several papers cover algorithms~\citep{tung2000automating,pezze2008},
 there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006}.
 
 
-\subsubsection{Orthogonal arrays}
+\subsubsection{Orthogonal arrays}\index{orthogonal arrays}
 
 Picture each parameter as an axis with as many marks
 on it as there are equivalence classes for that parameter.
@@ -1256,9 +1259,9 @@ There are testing tools that read your code in order to
 generate tests. They then watch your code run those tests,
 watching for branches, in order to determine what tests
 to create. Because these techniques simultaneously parse the
-code and run the code they are sometimes called concolic testing,
+code and run the code they are sometimes called concolic\index{concolic} testing,
 for concrete + symbolic. They fall under the umbrella of
-dynamic symbolic execution techniques. Microsoft's Intellitest
+dynamic symbolic execution\index{dynamic symbolic execution} techniques. Microsoft's Intellitest
 includes this capability, but the tools are uncommon on
 Linux and for most languages.
 
@@ -1276,7 +1279,7 @@ effective approach to the sandpile of possible parameter sets.
 
 We problematized the testing challenge by heaping data values,
 computational constants, and function options together into
-a jumble of parameters. We identified edge cases that come from
+a jumble of parameters. We identified edge cases\index{edge cases} that come from
 floating-point types and from string lengths. We can simplify
 testing by separating concerns in the program. If it's possible,
 put the equations, and their computational complexity, into
@@ -1302,7 +1305,7 @@ something known about the answer. Every unit test is two
 functions, the function under test and a parable
 of that function, written into the unit test itself.
 
-The accepted standard for scientific data entry is dual data
+The accepted standard for scientific data entry is dual data\index{dual data entry}
 entry. It's unlikely that two data specialists will enter
 the same data wrong in the same way. Any less effort is
 worthy of opprobrium.
@@ -1315,11 +1318,11 @@ Even so, if we're doing science with code, then we're asking
 new questions, and we ask them with new functions. We don't
 expect to know what the absolute correct answer should be.
 There is a computer science idea of an oracle that could
-slice the Gordian knot of the halting problem to tell you
+slice the Gordian knot of the halting\index{halting problem} problem to tell you
 what a function should return under all
 conditions~\citep{howden1986functional}. If we don't always
 know the what the exact result should be, then we have an
-oracle problem~\citep{sirer1999using}. We are mature enough,
+oracle\index{oracle problem} problem~\citep{sirer1999using}. We are mature enough,
 through our understanding of the vagaries of floating-point
 types and the errant nature of discretization of equations,
 to understand that even the most correct results are still
@@ -1345,7 +1348,7 @@ lists only three steps~\citep{dahlgren2005}.
 \end{enumerate}
 We could add more steps before, and after, these.
 
-For instance, a model of a population of voles might have
+For instance, a model of a population of voles\index{voles} might have
 births and deaths, with a birth rate and death rate that
 depend on environmental conditions, predator conditions,
 and nutrient conditions. We could represent such a model
@@ -1362,6 +1365,7 @@ it predicts those values. We can ask what, about the function,
 the test confirms, by looking at where, in the steps
 of adapting a mathematical model to code, the comparison
 diverges from the function-under-test.
+
 
 \subsection{Known answer}
 \subsubsection{Argument by authority}
@@ -2234,5 +2238,9 @@ construction of code, as well as testing. These are some recent highlights:
 	\item ``Development of Scientific Software and Practices for Software Development: A Systematic Literature Review,''~\cite{neumann2016}.
 \end{itemize}
 
+
 \bibliography{tsci}
+
+\printindex
+
 \end{document}
