@@ -1185,7 +1185,7 @@ improve testing, but there isn't a record of cases where
 it works a lot better than random testing~\citep{arcuri2011random}.
 
 
-\subsubsection{Single coverage}
+\subsubsection{All values}
 
 Separate parameter values, or combinations of parameter values,
 that should cause errors. Test each of those alone.
@@ -1239,7 +1239,7 @@ We can choose tests that cover that space evenly, as evenly
 as possible. It's the same principle that's used for doing
 high-dimensional integration~\citep{Owen1992}.
 
-The trouble with these orthogonal arrays is that they can
+Orthogonal arrays can
 be difficult to generate. The algorithms to make them
 are complicated and rarely included as programming libraries.
 Remember that we can choose different test generation strategies
@@ -1255,20 +1255,42 @@ and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,
 There are testing tools that read your code in order to
 generate tests. They then watch your code run those tests,
 watching for branches, in order to determine what tests
-to create. These dynamic symbolic execution techniques seem
-promising and are built into Microsoft's Intellitest.
+to create. Because these techniques simultaneously parse the
+code and run the code they are sometimes called concolic testing,
+for concrete + symbolic. They fall under the umbrella of
+dynamic symbolic execution techniques. Microsoft's Intellitest
+includes this capability, but the tools are uncommon on
+Linux and for most languages.
 
 
 \subsection{Conclusion}
-If you can separate parameter handling from the rest of the code,
-you can test better. The idea is to transform from input parameters
-that are user-friendly to those that are simpler for the algorithm
-to use.
-Think of parameter-handling as translation from an external
-     language to some kind of parameterization that's more
-     consistent, concise for internal processing.
 
+Choosing the right parameter sets to test is always a problem,
+and there are even more interesting edge cases for mathematical
+code, thanks to intricacies of the floating-point type and 
+the huge space of all possible vector inputs. This section
+formulated a big problem, but it also offered ways to attack
+that problem. Equivalence classes are a powerful reduction of
+the number of possible tests. Random testing is a clear and
+effective approach to the sandpile of possible parameter sets.
 
+We problematized the testing challenge by heaping data values,
+computational constants, and function options together into
+a jumble of parameters. We identified edge cases that come from
+floating-point types and from string lengths. We can simplify
+testing by separating concerns in the program. If it's possible,
+put the equations, and their computational complexity, into
+one function. Test that function for its numerical accuracy by
+exploring floating-point edge cases. Test, separately,
+options for how that equation is called, by creating a function
+that uses a mock version of the function.
+
+Separation of concerns for testing elucidates how we design
+high-performance code, in general. It tends to be a sequence
+of algorithms, joined by data movement from one data structure
+to another. The applications starts with parameter handling
+and bookends with data input and output. A clear internal structure
+to the program also creates focused testing.
 
 
 \section{Parallel implementation}\label{sec:parallel-implementation}
