@@ -1369,12 +1369,23 @@ diverges from the function-under-test.
 
 \subsection{Known answer}
 \subsubsection{Argument by authority}
-From a paper. Wikipedia. Whatever.
+Sometimes we believe a source that quotes a value. We could
+test a great-circle equation using the distance from Morocco
+to New York, according to Wikipedia. We could have a log
+file from a twenty year-old Cobol program. We could have
+a still-fallible gold standard, values quoted in a research article.
 
-If you read about an algorithm in a paper, and that paper has a table or figure,
-you could check your results against the values in the table or figure.
 Fig.~\ref{fig:wilson_chart} shows a chart from a paper. The unit test
 uses those figures.
+\begin{figure}
+    \centering
+    \includegraphics[scale=0.4]{wilson_chart.pdf}
+    \caption{A paper about confidence intervals published a chart of values for
+    the Wilson score interval~\citep{wallis2013binomial}, in the last two columns. Using $n$ and $p$
+    for a $95\:\%$ confidence interval, we can quote this chart and compare with
+    our code's output as a unit test.}
+    \label{fig:wilson_chart}
+\end{figure}
 
 \begin{lstlisting}[language=R]
 wilson_score_interval <- function(p, n, confidence) {
@@ -1429,20 +1440,106 @@ test_that("paper numbers match computed", {
 })
 \end{lstlisting}
 
-\begin{figure}
-    \centering
-    \includegraphics[scale=0.4]{wilson_chart.pdf}
-    \caption{A paper about confidence intervals published a chart of values for
-    the Wilson score interval~\citep{wallis2013binomial}, in the last two columns. Using $n$ and $p$
-    for a $95\:\%$ confidence interval, we can quote this chart and compare with
-    our code's output as a unit test.}
-    \label{fig:wilson_chart}
-\end{figure}
+Argument by authority isn't wrong. It's just weaker than having
+more thorough support for what we expect from a function.
+In the example above, it also makes that claim only for a few,
+select values, that are well away from edge cases.
+Even so, it's good enough to make that claim that the
+function-under-test was right at least once.
 
 
 \subsubsection{Known at certain values}
 
+Not every parallel implementation is a brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
+
 \subsubsection{Inverse problems}
+
+A lot of important scientific code looks at evidence and infers
+what must have caused that evidence. This kind of inference is
+called an inverse problem because it looks backwards from effect
+to cause. Examples include regression of points to find a slope
+and intercept, disaggregation of grouped data into finer groups,
+and more classic inverse problems, such as calculating the density
+of the earth from its gravitational field.
+
+While inverse problems are mathematically difficult, they create
+an opportunity for unit testing. I can simulate the
+problem, from physical system to its evidence, and then ask
+the inverse problem to return something close to the simulation
+I created.
+
+Let's make a survival analysis example. I have laboratory data
+on the number of days between the birth of a new brood of mosquitoes
+and the day on which each one dies. I've created a function that
+takes two arguments, the number of deaths per day since birth,
+and the temperature each day since birth. It returns a fit that
+tells me parameters for a gamma distribution of probability of
+death and a covariate effect for the temperature.
+
+\begin{lstlisting}
+def mosquito_survival_fit(deaths_per_day, daily_temperature)
+\end{lstlisting}
+
+\nodindent{}The given function should give an exact fit if
+the distribution of deaths is actually gamma-distributed and
+if the dependence on temperature is actually linear. We can
+construct that test by generating deaths using the hazard for
+a gamma distribution and applying a linear effect with temperature.
+
+When we make data to use in an inverse test, it's a little different
+than actually simulating the data. I don't want to draw random
+numbers the way I would for a simulation. I would prefer that
+the values be evenly spread over all probable outcomes so that
+there are no outliers. One way is to generate values from a
+distribution using inversion. For instance, if a probability
+distribution, $f(x)dx$ has a cumulative distribution function
+$F(x) = \int_0^x f(s)ds$, then start by creating a set of $N$
+values, $U=n / (N + 1)$ for $n=1\ldots N$. Then set $x$ by
+solving $U_i = F(x_i)$.
+
+For different problems, I'm looking for different ways to 
+make the inverse problem nearly-exact. For instance, if I need
+points distributed in space, a Sobol sequence gives pseudorandom
+values that are mostly-even through space. If the inverse
+problem is looking for a smooth fit to points, I try a forward
+simulation that's purely linear or that has noise applied that
+has values above and below the line by the same amount.
+By creating a forward simulation that's well-behaved, I
+create an inverse problem that can be close to the original.
+
+The discussion, thus far, has treated every function as an
+equivalent challenge. Computing the distance between points
+on the earth with the Haversine formula is a challenge of much
+different size than a meta-regression of cancer surveys.
+A function that doesn't call other functions, besides maybe
+some trigonometric library functions, is a low-level function.
+A function that calls functions that, themselves, call functions,
+is a high-level function. The \lstinline|main()| function is
+the highest-level function.
+
+Inverse problems are wonderful points to test because they
+tend to be high-level functions. If tests pass here, that means
+that, for at least this case, all of the functions below
+have done their job well-enough that their faults aren't
+visible to this test. I like to build trust in functions by
+testing both parts and whole, but high-level testing addresses
+a broad range of risks with fewer tests.
+
+
 
 \subsection{Code it twice}
 \begin{itemize}
@@ -1451,7 +1548,7 @@ test_that("paper numbers match computed", {
     \item library
     \item compiler
     \item hardware
-    \end{itemize}
+\end{itemize}
 
 \subsubsection{Language}
 There is something lovely about the task of rewriting code from
