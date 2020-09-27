@@ -1,0 +1,141 @@
+
+
+I have written unit tests without thinking about how I chose
+what to test. Foremost in my mind is risk, which I estimate
+from how likely something is to go wrong, how bad it will be,
+and how hard it is to mitigate. That's the first two steps
+of choosing unit tests.
+
+
+
+Methods to test parameter logic all have the same underpinning,
+that they will try to test at least one set of parameters from
+each of the equivalence classes of inputs. Deciding what is an
+equivalence class can be difficult. Sometimes two parameters
+sets are equivalent in terms of the mathematical statement of 
+the model, but their representation in code makes one set
+have a different risk from another. For instance, a function of small
+values would be well-defined as an equation, but it could cause
+denormalization when written in code.
+It can also be the other way around, that
+the mathematical statement of a model makes clear what parameter
+sets may be equivalent. Information from both statements of
+a function will be helpful.
+
+Not every parallel implementation is a brute-force retelling
+of a model. Most mathematical functions provide finger-holds
+support of their correctness.
+
+The simplest of these are parameters for which a function
+takes a known value. The function could be a mess of
+polynomials of trigonometric quantities,
+\begin{equation}
+  y = (\sin x)^3 - 6 (\cos x)^2 + 2,
+\end{equation}
+but these simplify considerably at $x=0, \pi/4, \pi/2, \pi,$
+and so on. If the function should divide by zero for some
+number, then that, too, is a parameter for which the function
+has a known value, an exception.
+
+
+\subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
+The sections above all imply that there could be some way
+to emphasize which test are chosen, based on an assessment
+of which parameters carry the most risk. For instance, if
+a parameter is an option to make a copy of the input data
+before further work, it would be enough to test that exactly
+once, and not in all other parameter combinations. On
+the other hand, there may
+be certain parameter values that should be thoroughly-tested
+because they challenge the numerical precision of the algorithm.
+
+The ability to prefer tests of certain sets of parameter values
+is called \emph{stratification.} That means you take any
+of the test generation methods above and give the test author
+the ability to weight which tests it should generate.
+
+The throw out some of the generated tests is called
+\emph{filtering.} Sometimes it's easier to generate tests
+and toss useless ones than it is to generate the most-desired
+tests in the first place.
+
+Some of the more professional testing software includes
+these capabilities, such as \textsc{aetg}~\citep{cohen1997aetg},
+\textsc{cts}~\citep{hartman2004problems},
+and the \textsc{act} library~\citep{kuhn2008automated}.
+
+
+\subsubsection{All other methods}
+The orthogonal arrays, mentioned in Sec.~\ref{sec:parameter-decision},
+are yet another way to generate tests that span the space of
+all possible parameters~\citep{Owen1992}.
+Whichever method you choose, it's
+good to have one of these methods available when it's time to
+do user-level testing on scientific code.
+\citet{petke2015practical} cover these strategies in their book,
+and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
+
+
+
+Our attention shifts to asking, which parameter sets should I test
+for this function? Which parameter sets are meaningfully different
+test? How do I know when I've tested enough of them?
+
+
+\section{disaggregating function}
+
+We could be testing a function where we know what answer it should
+give. For instance, take a function which disaggregates its input
+vector into finer bins.
+\begin{lstlisting}
+function disaggregate(coarse, coarse_bins, fine_bins)
+\end{lstlisting}
+For the unit test, we can create a smooth-enough function on
+the fine bins, aggregate it to the coarse bins, and use
+that as our known input.
+
+
+\section{Faults in Mathematical Code}\label{sec:faults-and-failures}
+
+For each section, ask what faults does this technique limit?
+For instance, using a limit test for constant-mortality mean age
+ensures you don't have a numerical fault.
+
+\subsection{Fault versus Failure}
+Jorgensen's \emph{Software Testing: A Craftsman's Approach} distinguishes
+faults from failures~\citep{jorgensen2013}.
+A fault is the characters that were typed
+incorrectly. A failure is observation that something went wrong.
+For instance, there may be a fault that 0.3 is assigned to an integer
+instead of assigning it to a double. The failure will happen later,
+in the code that divides $1 / 0$.
+
+Any failure is a problem. We don't want to throw exceptions or segfault.
+Worse for mathematical code is when an error in the code isn't visible
+but does give a wrong answer.
+The worst problem is faults that aren't failures.
+
+
+\subsection{Classes of Faults}
+Jorgensen gives a set of fault categories and examples, elided here:
+\begin{itemize}
+    \item Input/Output - incorrect input accepted, incomplete result
+    \item Logic - missing cases, test of wrong variable
+    \item Computation - incorrect algorithm, parenthesis error
+    \item Interface - parameter mismatch, call to wrong procedure
+    \item Data - Incorrect type, wrong data, off by one
+\end{itemize}
+These all apply and, yes, read Jorgensen, but most of this article 
+expands upon a single category of fault: incorrect algorithm.
+
+This document covers two different kinds of failure-free faults.
+\begin{itemize}
+\item Simple data manipulation that doesn't do what the user
+   expected it to do.
+   
+\item Mathematical functions that return a result that looks
+   reasonable but isn't correct.
+\end{itemize}
+While these faults are within the taxonomy of faults
+in any book on testing, we can discuss some of the particular
+challenges that complicated mathematical functions introduce.

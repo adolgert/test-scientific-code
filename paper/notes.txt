@@ -1,0 +1,118 @@
+From the IEEE 2010, what are your goals with classification? Our goal is minimizing risk.
+
+This is the Orthogonal Defect Classification, which is more used than the IEEE standard. chillarege1996orthogonal.
+
+Risk = chance of happening x how bad it is. From the IEEE doc.
+
+"deviations to intent, which warrant change" (ODC)
+
+Raleigh model of defect discovery. Simple and intuitive.
+
+ODC defect type: assignment, checking, function, interface, timing.
+
+Function - a function defect is one that affects significant capability, end-user features, product application programming interface (API), interface with hardware architecture, or global structure(s). It would require a formal design change.
+
+Assignment. Conversely, an assignment defect indicates a few lines of code, such as the initialization of control blocks or data structure.
+
+Interface. Corresponds to errors in interacting with other components, modules, device drivers via macros, call statements, control blocks, or parameter lists.
+
+Checking. Addresses program logic that has failed to properly validate data and values before they are used, loop conditions, etc.
+
+Timing / serialization. Timing/serialization errors are those that are corrected by improved management of shared and real-time resources.
+
+Build/package/merge. These terms describe errors that occur due to mistakes in library systems, management of changes, or version control.
+
+Documentation. Errors can affect both publications and maintenance notes.
+
+Algorithm. Errors include efficiency or correctness problems that affect the task and can be fixed by (re)implementing an algorithm or local data structure without need for requesting a design change.
+
+Function and algorithm defects early. Assignment and checking defects persist later.
+
+
+Three triggers of dormant faults: review, function/unit tests, and system tests.
+
+Failure mode is symptom, impact, severity.
+
+Symptom is visible attribute to the customer.
+
+Symptom attributes: hang, wait, loop, incorrect output, message, abnormal termination (abend).
+
+Impact characterizes the magnitude of the outage caused (severity), such as timing, crash, omission, abort fail, lucky, and pass.
+
+
+System test triggers:
+
+- recover/exception handling. Exception handling or recovery of the code is initiated due to conditions in the workload. The defect would not have surfaced had the exception handling process or the recovery process not been called.
+
+- System start-up and restart.
+
+- Workload volume / stress.
+
+- Hardware configuration and software configuration. Changes in environment or interaction among software.
+
+- Normal mode.
+
+Review or inspection triggers.
+
+- Backward compatibility. Understanding how the current version of the product would work with earlier versions or maintain n to n+1 (subsequent release) compatibility. This usually requires skill beyond just the existing release of the product.
+
+- Lateral compatibility. As the name suggests, this triger has to do with how this product would work with the other products within the same software configuration. The experience required by the individual should span the subsystems of the product and also th application program interface of the product with which it interacts.
+
+- Design conformance. These faults are largely related to the completeness of the product being designed with respect to the requirements and overall goals set forth for the product. The skills required for finding these kinds of triggers has more to do with an understanding of the overall design than with the kinds of skills required to ensure compatibilitiy with other products.
+
+- Concurrency. This has to do with understanding the serialization and timing issues related to the implementation of the product. Specific examples are locking mechanisms, shared regions, and critical sections.
+
+- Operational semantics. This has to do largely with understanding the logic flow within the implementation of the design. It is a trigger that can be found by people who are reasonably new but well trained in software development and the language being used.
+
+- Document consistency / completeness. This has to do with the overall completeness of a design and ensures tha tthere is consistency between the different parts of the proposed design or implementation. The skill is clearly one that requires good trainign and implementation skills, but may not require significant in-depth understanding of the products, dependencies, etc.
+
+Rare situation. These triggers require extensive experience of product knowledge on the part of th einspector or reviewer. This category also recognizes the fact that there are conditions peculiar to a product that the casual observer would not immediately recognize. These may have to do with unusual implementations, idiosyncrasies, or domain specific information that is not commonplace.
+
+
+Function test triggers: "Why did you write the test case?" Motivations that drive test case generation.
+
+Test coverage. Exercising a function through the various inputs to maximize the coverage that is possible of the parameter space. This would be classified as a black-box test trigger.
+
+Test sequencing. These are test cases that attempt to sequence multiple bodies of code with different sequences. It is a fairly common method of examining dependencies which exist that should not exist. This is also a black-box test.
+
+Test interaction. Tehre are tests that explore more complicated interactions between multiple bodies of code usually not covered by simple sequences.
+
+Test variation. This is a straightforward attempt to exercise a single function using multiple inputs.
+
+Simple path coverage. A white-box test that attempts to execute the different code paths, increasing statement coverage.
+
+Combination path coverage. Another white-box test that pursues a more complete signal of code paths, exercising branches and different sequences.
+
+
+From the IEEE Unit testing document.
+
+Base choice, or base value, is the value of a parameter that's considered normal.
+
+c-use is computational data use, the use of a variable in any circumstance.
+
+p-use is predicate data use.
+
+p-v pair. Test item and value assigned to that item.
+
+two-value boundary testing = at boundary and outside.
+three-value boundary testing = at boundary and on each side.
+
+Each choice testing: each parameter value appears at least once.
+
+A vector parameter could be seen as a kind of scenario testing because it's a series of interactions.
+
+Decision is if-then-else. Branch is a branch in the control flow. Cuts on a dataframe are branches.
+
+Error-guessing: Design a checklist of defect types that may exist in the test item. Allow the tester to identify inputs to the test item that may cause failures. Each defect type shall be a test condition.
+
+
+Software/System Product Quality, according to IEEE standards on unit tests.
+
+- Functional suitability: functional completeness, functional correctness, functional appropriateness.
+- Performance efficiency: time behavior, resource utilization, capacity
+- Compatibility: coexistence, interoperability
+- Usability: appropriateness recognizability, learnability, operability, user error protection, user interface aesthetics, accessibility
+- Reliability: Maturity, availibility, fault tolerance, recoverability
+- Security: confidentiality, integrity, non-repudiation, accountability, authenticity
+- Maintainability: modularity, reusability, analysability, modifiability, testability
+- Portability: adaptibility, installability, replaceability
