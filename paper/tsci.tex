@@ -1916,27 +1916,30 @@ function, but we can also know how the function approaches
 that limit. Another precalculus friend, the Taylor series
 writes a function as a sum of terms that get smaller,
 \begin{equation}
-  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2 + \epsilon.
+  f(x_0+x) \approx f(x_0) + \frac{f'(x_0)}{2}x + \frac{f''(x_0)}{6}x^2.
 \end{equation}
 If we know the first term in the series, then the second term
 is a good guess for how far the function's output should be from
 the limiting value, as a function of $x$.
-
-For example, let's say our function is $2xsin(x)$. We know that
-$f(\pi/2)$ is blah and $f'(\pi/2)$ is blah. Then we can test.
-\begin{lstlisting}
-x0 = 0.5 * pi
-abs(f(x0 + x) - f(x0) * x
-\end{lstlisting}
-It will be a quadratic that hits zero, with higher-order terms that
-are smaller.
+\begin{equation}
+  f(x_0+x)  - f(x_0) - \frac{f'(x_0)}{2}x \approx \frac{f''(x_0)}{6}x^2.
+\end{equation}
+We can create a test that takes a series of values,
+$f(x_0+x)$, and takes the logarithm, in order to check that
+the slope is $2\log(x)$ and has the expected intercept.
+\begin{equation}
+  \log\left(f(x_0+x)  - f(x_0) - \frac{f'(x_0)}{2}x\right) \approx \log\left(\frac{f''(x_0)}{6}\right) + 2\log x.
+\end{equation}
+The third-order term will create noise, but we've created a
+test on the second derivative of how a function approaches a
+value, which is a stringent test, even with noise.
 
 
 \subsection{Using symmetry to test a function}\label{sec:symmetry-test}
 
 Sometimes knowing the math of a software function lets you
 test the software, even when you have an oracle problem.
-\emph{Metamorphic testing} uses the symmetry of the math function
+\emph{Metamorphic testing}\index{metamorphic testing} uses the symmetry of the math function
 in order to test the correctness of the software function~\citep{ding2016,guderlei2007,kanewala2015,liu2014}.
 
 The mathematical description of a function is that it relates
@@ -1987,7 +1990,7 @@ test_that("dividing by a constant multiplies by a constant", {
 })
 \end{lstlisting}
 
-The metamorphic relation between $m$ and $n$ ties these two together
+The metamorphic\index{metamorphic testing} relation between $m$ and $n$ ties these two together
 for parameter testing, too. It means that $(m=2, n=0.5)$ is in the same
 equivalence\index{equivalence class} class as $(m=0.5, n=2).$ Knowing
 metamorphic relations reduces the space of parameters to test.
@@ -2005,8 +2008,78 @@ grouping of terms, or off-by-one errors. It also has an opportunity to
 find faults that result from denormalization or loss of significant digits
 in floating-point math.
 
+
 \subsection{Units as symmetry}
-Use the scaling relations, where you set up the subspace.
+
+Almost every program has symmetry relationships that can be used
+to either improve testing or, alternatively, simplify the program in
+order to reduce risk. We specify programs with lots of parameters,
+but the underlying equations depend on combinations of those
+parameters. Physicists find insight in how parameters combine
+to \emph{scale}\index{scaling} an equation~\citep{barenblatt1996}.
+The techniques for finding how parameters combine are called
+nondimensionalization\index{nondimensionalization}. It's a
+well-understood set of steps to use for any math equation, especially
+for differential equations.
+
+The central idea of nondimensionalization is that every physical
+law (or biological law, epidemiological law, whatever) can be
+written as a function of dimensionless independent variables
+and a set of parameters, and it returns dimensionless variables,
+which are, themselves, scaled by parameters to produce the result.
+
+Let's take the mean age of death, above, as an example.
+The physical law is the function we called $f_1$.
+Recall $a/n = f_1(mn)$.
+The dependent variable is a time, so it has time units, $[T]$.
+The independent variable, the mortality rate, is a rate,
+so its units are inverse time, $[T^{-1}]$.
+The duration of an age interval is the only parameter, a time, $[T]$.
+Every argument to $f_1$ has no units and it returns a result with no units.
+
+In practice, you can nondimensionalize an equation by replacing
+each variable, $x$ by $x=\bar{x}/k_x$, where $\bar{x}$ is the
+nondimensional variable and $k_x$ is the scaling constant. Sometimes
+it's helpful to add an offset, $x=(\bar{x} - x_0)/k_x$. Then
+push the constants around the equation until they sit near each
+other and choose values for the arbitrary new constants, such as $k_x$,
+that set groups of constants to the value one.
+
+If you're familiar with how vector subspaces work, then
+you can work out some of the details for yourself.
+Picture a vector subspace with dimensionality equal to the
+number of base units of the parameters, so we include
+length, $[L]$, time $[T]$, mass $[M]$, and so on, if they are used
+by the given parameters. Each parameter's units can be described
+by a vector in that space, acceleration would be a $[LT^{-2}]$, or
+a vector $(1, -2, 0)^t$. If we make a matrix using a column
+for each parameter, then the number of nondimensional parameters
+is the size of the nullspace of that matrix. For $n$ parameters
+and $m$ base units, there will be $n-m$ nondimensional parameters.
+
+There is some history to using nondimensional parameters in
+computations. Early computers didn't have a floating-point type.
+They used fixed-point\index{fixed-point type} types, which are represented as integers
+with a known scaling value. You can think of them as floating-point
+values that all have the same exponent. If you want to compute
+with types like this, it helps to know that all of the values
+are somewhere near one. They can be ten times as large or ten
+times as small, but you try to scale the inputs so that
+computations are near one and then rescale the outputs at
+the end before returning results.
+
+Somewhere between the use of fixed-point types and discovery
+of how beneficial it is to reduce parameters by scaling
+equations, a motto was born, ``Computer code is always
+dimensionless.'' By organizing code so that the inputs are
+rescaled, at the start, into dimensionless parameters and
+rescaled independent values, the risk associated with
+mistaken units is all placed into one, testable area.
+The rescaled, dimensionless central computation then has
+fewer parameters to test. The process pushes our understanding
+of the problem into code with clearer, testable expected
+behavior.
+
 
 \section{Statistics for testing}\label{sec:statistical}
 
