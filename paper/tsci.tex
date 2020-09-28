@@ -1839,12 +1839,43 @@ look at how alternative choices probe faults in code.
 
 \section{Testing traits of a function}
 
-
-
 \subsection{Measuring closeness}
 
-Local and global measures.
-L1 norm. Least squares. Sum of absolute value.
+If I want to test whether $a$ and $b$ are close to each other,
+the absolute\index{absolute error} error between them is $|b-a|$, and I can write a unit
+test by estimating how large a difference between them is reasonable,
+given the number of calculations involved.
+\begin{lstlisting}
+assert abs(b - a) < 1e-7
+\end{lstlisting}
+Unit tests more often use relative\index{relative error} error, because it asks what
+fraction the result is of the accepted answer, $|(b - a) / a|$.
+\begin{lstlisting}
+assert abs((b - a) / a) < 1e-3
+\end{lstlisting}
+This is particularly helpful because floating-point types carry
+significant digits. That means they offer good relative error,
+no matter whether the value is near $10^{-5}$ or $10^5$. We test
+them using the machine epsilon and relative error.
+\begin{lstlisting}
+assert abs((b - a) / a) < 1000 * machine_epsilon
+\end{lstlisting}
+Every language has a library function that will tell you the
+value for machine epsilon, which is the smallest fraction that
+one floating-point type can differ from another, as a relative
+error.
+
+If we need to compare one vector of values with another, then
+we could require the error between each pair of values be less
+than a given number. The easiest way to do that is by using
+what's called an $L_1$ norm, meaning we calculate the absolute error and
+look at its maximum. The same technique works for relative error.
+
+A more interesting question is whether two vectors are a little
+bit off from each other everywhere. To answer this question,
+we sum the absolute or relative errors and put a bound on that
+sum. 
+
 
 \subsection{Continuity}
 
@@ -1860,6 +1891,8 @@ for (x1, x2) in [(0, 1), (0, .1), (0, .001)]:
 The \lstinline!C! variable is a bounds on the slope for any
 pair of numbers.
 
+\subsection{Approach to limiting values}
+
 Sometimes a limit of a function is the same limit you know
 from high school precalculus,
 \begin{equation}
@@ -1870,12 +1903,15 @@ the same. You can test that a function is near the limit
 as the value gets larger, or closer to zero. Better, you can
 test that the function gets closer to the limit as the
 parameter gets closer to its limit.
+\begin{lstlisting}[language=python]
+for (x1, x2) in [(pi, 100), (pi, 1000), (pi, 10000)]:
+    assert abs(f(x2) - x1) < abs(f(x2 / 10) - x1)
+\end{lstlisting}
+This kind of convergence test can be more sensitive to
+numerical accuracy problems than a simple test
+that \lstinline|abs(f(10000) - pi) < 1e-5|.
 
-\subsection{Approach to limiting values}
-
-This is a game where incremental understanding of math
-gives incrementally more careful attention to risk in the
-function under test. We can know the limiting value of a
+We can know the limiting value of a
 function, but we can also know how the function approaches
 that limit. Another precalculus friend, the Taylor series
 writes a function as a sum of terms that get smaller,
@@ -1885,6 +1921,15 @@ writes a function as a sum of terms that get smaller,
 If we know the first term in the series, then the second term
 is a good guess for how far the function's output should be from
 the limiting value, as a function of $x$.
+
+For example, let's say our function is $2xsin(x)$. We know that
+$f(\pi/2)$ is blah and $f'(\pi/2)$ is blah. Then we can test.
+\begin{lstlisting}
+x0 = 0.5 * pi
+abs(f(x0 + x) - f(x0) * x
+\end{lstlisting}
+It will be a quadratic that hits zero, with higher-order terms that
+are smaller.
 
 
 \subsection{Using symmetry to test a function}\label{sec:symmetry-test}
@@ -1942,6 +1987,17 @@ test_that("dividing by a constant multiplies by a constant", {
 })
 \end{lstlisting}
 
+The metamorphic relation between $m$ and $n$ ties these two together
+for parameter testing, too. It means that $(m=2, n=0.5)$ is in the same
+equivalence\index{equivalence class} class as $(m=0.5, n=2).$ Knowing
+metamorphic relations reduces the space of parameters to test.
+
+One way to use metamorphic relations is to rewrite a function, when possible,
+so that there is an outer function that takes parameters in a form that's
+convenient for the caller and an inner function that takes the reduced
+set of internal parameters. This means we create a
+\lstinline|mean_age_of_death(mn)|, and test that separately.
+
 Metamorphic testing is an assertion about a symmetry relationship between
 the domain and range of a function. Because it's an invariant at the top-level
 of the function, it has an opportunity to find simple faults in algebra,
@@ -1949,7 +2005,8 @@ grouping of terms, or off-by-one errors. It also has an opportunity to
 find faults that result from denormalization or loss of significant digits
 in floating-point math.
 
-
+\subsection{Units as symmetry}
+Use the scaling relations, where you set up the subspace.
 
 \section{Statistics for testing}\label{sec:statistical}
 
