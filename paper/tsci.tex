@@ -1157,6 +1157,13 @@ the same kind of test design we use to decide how
 to plant test plots of plants, or how to pick gels to
 run in a bench experiment.
 
+Designating a subset of all tests as acceptance tests is an
+example of test case prioritization~\cite{rothermel1999test}.
+We prioritize tests by hand, by marking tests to be run under
+different conditions, but tests for scientific code can be lengthy,
+which makes it worth considering automatically reordering tests
+so that those that are most sensitive to correctness run by 
+themselves, or run first~\cite{yoo2012regression}.
 
 \subsubsection{Combinatorial excursions}
 If you decide that there is some most-common way to call
@@ -1279,7 +1286,7 @@ effective approach to the sandpile of possible parameter sets.
 
 We problematized the testing challenge by heaping data values,
 computational constants, and function options together into
-a jumble of parameters. We identified edge cases\index{edge cases} that come from
+a jumble of parameters. We identified edge cases\index{edge case} that come from
 floating-point types and from string lengths. We can simplify
 testing by separating concerns in the program. If it's possible,
 put the equations, and their computational complexity, into
@@ -1494,7 +1501,7 @@ death and a covariate effect for the temperature.
 def mosquito_survival_fit(deaths_per_day, daily_temperature)
 \end{lstlisting}
 
-\nodindent{}The given function should give an exact fit if
+\noindent{}The given function should give an exact fit if
 the distribution of deaths is actually gamma-distributed and
 if the dependence on temperature is actually linear. We can
 construct that test by generating deaths using the hazard for
@@ -1526,9 +1533,9 @@ equivalent challenge. Computing the distance between points
 on the earth with the Haversine formula is a challenge of much
 different size than a meta-regression of cancer surveys.
 A function that doesn't call other functions, besides maybe
-some trigonometric library functions, is a low-level function.
+some trigonometric library functions, is a low-level\index{low-level} function.
 A function that calls functions that, themselves, call functions,
-is a high-level function. The \lstinline|main()| function is
+is a high-level\index{high-level} function. The \lstinline|main()| function is
 the highest-level function.
 
 Inverse problems are wonderful points to test because they
@@ -1542,104 +1549,154 @@ a broad range of risks with fewer tests.
 
 
 \subsection{Code it twice}
-\begin{itemize}
-    \item language
-    \item OS platform
-    \item library
-    \item compiler
-    \item hardware
-\end{itemize}
 
-\subsubsection{Language}
-There is something lovely about the task of rewriting code from
-one language to another. On one side sits working code, problems
-solved. On the other is a green field for expressing it in the idioms
-of a new language. The original code is a gift, not only as a guide,
-but as a set of unit tests for the new code, but only for those
-willing to take the painful step of limiting their first translation
-to perserve structure around the riskiest functions.
+\subsubsection{Language and libraries}
 
-Most languages provide some built-in interoperability to call
-other languages. R, C++, Julia, and Python play together like hamsters
-in a habitrail. It's perfectly reasonable to keep code from
-a different language in with the suite of unit tests and to
-call those functions when the interoperability is available.
+It may seem like a chore to translate code from one language
+to another, but it's an opportunity to find faults in the code,
+if you're careful with the process.
 
-Testing across languages, or in the same language on different
-operating systems, can probe a unique set of problems. Data types
-change, revealing limits to numerical accuracy and inappropriate
-assumptions about data structure. Libraries change, the ones that
-provide special functions or system services. For instance, the
-generalized inverse in Python will return a different value
-from the generalized inverse in R. When this breaks tests, it
-clarifies which, of the four kinds of generalized inverse,
-the code needed, and that there should be a test to see which
-is available.
+We generally find faults in code by reading it during reviews, by testing
+it, and by running it. Translating code to a new language requires
+a very close read, so it serves as a review for off-by-one errors,
+loop invariants, and the logic of branches. Something as simple
+as changing counters from 1-based in \rlang to 0-based in \cpp
+can bring your focus to every index in a method.
 
-\subsubsection{Testing the chip architecture}
-Let's say you have a cluster of computers. They are all Intel machines,
-but they come from different years. They could be different architectures
-or just different steppings of the \cpu, which is the least difference
-one can have between two chipsets. You compile code on one machine,
-or you install some \rlang package that compiles code underneath. When
-you move to another computer on another day, that same code fails
-to run with the message, ``invalid opcode.''
+We also get to see how the code interacts with a new set of
+libraries that support it. For instance, the generalized matrix pseudoinverse
+function built into \rlang returns the Moore-Penrose pseudoinverse\index{pseudoinverse}
+by default, while the one in Python~2.7 returned one of the three
+other kinds of pseudoinverses. That took me
+a full day to figure out, but the function-under-test is better
+for that work.
 
-An opcode is a machine-language instruction. The computer you used
-yesterday knew a command that's slightly too fancy for the computer
-you're using today, and it failed. You have to clean out the code
-and recompile today. It's not that the new computer is just older.
-It's still possible that, were you to switch back, there might be
-the same message again. The history of \cpu opcodes isn't a forward
-march into a larger, better set.
+Rewriting a function in a new language is most fruitful
+if you adapt a core guideline from refactoring, which says that,
+at each step, you should either move the code around or change
+its functionality. By not doing both at the same time, you reduce
+your mental load. For rewriting code, that means you rewrite
+the same functions, with the same testable structure, before
+you adapt those functions to idioms of the new language.
 
-That scenario would be annoying, and it's a headache for people
-saddled with heterogenous clusters. They solve it with, for instance,
-creating architecture-specific shared drives so that they can
-install a different version of the software for each version of
-system architecture on the cluster. That scenario is, however, a
-best case scenario.
+It's reasonable to keep code from a different language in
+the unit testing suite, to execute it as part of those unit
+tests, for direct comparison.
 
-The worse scenario, and I wish this were rarer, is that the
-software runs on the other computer but gives the wrong error.
-It can fail silently. This seems like an abrogation of a compiler's
-contract with its faithful coder, but it isn't. That compiler
-ensured that the code ran well enough on one target architecture.
-The problem is that compiler optimizations at level \textsc{o3}, and above,
-are willing to make slightly riskier choices that yield great
-performance benefits. These choices are tuned to the architecture
-at hand, or as requested by compiler options, and, while they may
-run on similar architectures, carry more risk of error on them.
-It solves the problem of having languages
-that don't clearly represent time-saving invariants and of coders
-who can't afford motorcycles.
 
-There's a solution for this, too. Turn all optimizations down
-to \textsc{o2} or lower. Or claim to the compiler that the \cpu
-understands no later than the \textsc{sse2} instruction set from 2000.
-Unless you're intentionally commemorating the year Phil Katz died, you'll see
-this as a severe loss of performance.
+\subsubsection{Operating system platform}
 
-The last option to deal with this problem is called checkout,
-which is ``testing conducted in the environment to ensure that a software product performs as required after installation. (IEEE 829-2008)'' It means that you create a test to run before you
-run code on a new machine. It won't do the work of creating
-a separate version of the code, if needed, but it tells you if
-you need it. You don't generally care about integer performance
-here. You care about vectorized code and floating-point code.
-That's where the problems will be, so you can subset the test
-suite for these acceptance tests.
+I was tasked with porting high-performance computing applications
+(like Charm, Lammps, VASP) from Linux to Windows, and the Intel
+compiler's porting manual had an aside that porting an application
+from one operating system to another improves the quality of a code base.
+I hadn't thought about it before, but I had been seeing bug
+after bug that came from undefined behavior in \textsc{c} code or
+from a lack of specificity about library implementations (such
+as arc tangent).
 
-Designating a subset of all tests as acceptance tests is an
-example of test case prioritization~\cite{rothermel1999test}.
-We prioritize tests by hand, by marking tests to be run under
-different conditions, but tests for scientific code can be lengthy,
-which makes it worth considering automatically reordering tests
-so that those that are most sensitive to correctness run by 
-themselves, or run first~\cite{yoo2012regression}.
+Running code on a different operating system creates problems
+for parts of the application that do multi-threading, networking,
+and file systems, all the parts that interact with the world outside
+the application and are outside the scope of this document.
+
+Changes that affect the science part of an application will
+be floating-point types, as usual. They will be the common float exceptions
+and how faults in mathematical code become failures for that code.
+
+Some correctness problems in scientific code come from ways
+the compiler can fail to deliver its promise to faithfully
+add, subtract, multiply, divide, and round. This seems like
+a promise the compiler would keep, but some compiler optimizations
+can be risky because they assume the code they optimize will
+be well-behaved. Ill-behaved code can be what \cpp calls
+``undefined behavior,''\index{undefined behavior} such as dereferencing a null pointer
+or failing to return a value from a function that declares
+it does return a value. Most of the time, it comes from code
+that has a mistake, but it's a mistake that one particular
+compiler, or one particular set of compiler flags, avoids
+turning into a failure.
+
+Therefore, running code on different operating systems tests
+the code's model of its runtime. That is how the code imagines
+it will be supplied with memory and how it imagines threads
+will work. It's how the code expects a divide-by-zero to return
+an $\infty$ or $-\infty$ instead of raising an exception.
+By running the code on different operating systems, we ask
+whether it makes reasonable, conservative assumptions about
+that model of the runtime, or whether it is prone to error.
+
+We discover compiler and operating system problems when we
+change hardware architectures, change operating systems,
+change compilers, or change compiler flags. This can happen
+twenty times a day if you run code on a cluster that has
+a heterogeneous set of hardware architectures. Even CPUs with
+the same brand, the same product name, and different stepping
+numbers (fraternal twins, not identical twins), can react differently
+to the same code.
+
+As a result, we can also think of testing as reassurance that this
+code runs well today, on this system. The \ieee standard 829--2008
+calls this checkout\index{checkout testing} testing, 
+``testing conducted in the environment to ensure that a
+software product performs as required after installation.''
+I haven't seen experience studies that show what tests will most
+reliably expose failures during checkout. Because most of
+the time, I'm running checkout tests on the same software
+and operating system, but heterogeneous architectures, I expect
+that problems will arise from differences in how they support
+\textsc{mmx} routines, the set of machine language to support
+multimedia instructions. These are crucial to speed for scientific
+code and vary widely across versions of chips. I run checkout
+tests on every new machine, so I want them to be just a subset
+of the full test suite, so I choose tests that are
+happy paths of the most mathematically-intensive functions,
+and hope for the best.
+
+
 \subsection{Traverse math choices}
 
 \subsubsection{Form of equations}
-Same distribution with different parameterization.
+Sometimes I decide it would be cooler to rewrite a polynomial,
+\begin{lstlisting}
+a0*x^3 + a1*x^2 + a2*x + a3
+\end{lstlisting}
+so that it's in Horner form,
+\begin{lstlisting}
+((a0*x + a1)*x + a2)*x + a3
+\end{lstlisting}
+as though the compiler couldn't figure that out on its own.
+
+If I rewrite a function to use Horner form, and then I test
+the former version against the new one, it tests parenthesis
+placement.
+
+More seriously, it can make sense to switch from one parameterization
+to another, such as switching from the negative binomial for
+$k$ failures
+\begin{equation}
+f(k;r,p) = \genfrac(){0pt}{2}{k+r-1}{k}p^r(1-p)^k
+\end{equation}
+to the negative binomial for $n$ trials,
+\begin{equation}
+f(k;r,p) = \genfrac(){0pt}{2}{n-1}{r-1}p^r(1-p)^{n-r}.
+\end{equation}
+You can get the same work done with both versions, but you have to
+juggle the parameters differently, and each one is clearer for
+different situations.
+
+If I rewrite a function to use an alternate version of the
+negative binomial, it tests the code to setup the parameters,
+make the call, and interpret samples from that distribution.
+It's a test of whether the code is typed correctly but also
+a test of how the math is used. The differences in the two
+distributions are about interpretation of a stochastic process.
+
+There is a principle in statistics that if a variable must
+be between zero and $k$, then uncertainty in that variable is bounded
+by $k$. Similarly, we can't say here that either implementation
+of a function is correct, but they do agree with each other.
+
 
 \subsubsection{Stage of derivation}
 
@@ -1689,42 +1746,87 @@ in the model.
 
 \subsubsection{Representation of physical system}
 
-\subsection{Measuring closeness}
+I mentioned earlier a birth-death model for voles. I could
+write the math as an ordinary differential equation or I could
+write the math as sampling a probability distribution for any single
+vole to give birth or die. These are two very different representations
+of the same biological system. The first is deterministic and applies
+to large populations. The second is stochastic and applies to
+populations of any size.
 
-Local and global measures.
-L1 norm. Least squares. Sum of absolute value.
+If we think of one of these representations as a test of our
+implementation of the other, we need to use our criteria for
+a good test. Ask what are the largest risks in an implementation
+and how the second representation limits those risks by giving
+us more precise expectations of its behavior.
+
+Such a comparison would be a high-level test, so it would exercise
+a lot of code. It would test algorithmic errors and decision errors
+in all of that code. That's an efficient use of testing, but it also
+has drawbacks. Small faults in some functions may cause minor
+changes to a resulting value, too small to make a test fail
+in one instance, but possibly a problem for a different set
+of parameters. A high-level test can also make debugging different
+if the test fails, because there is more code to search for
+the problem.
+
+The larger challenge is that two different representations of
+the same model are sometimes supposed to disagree. Let's say
+we ran the stochastic model of the voles a million times and
+computed an average behavior. This will converge to the ordinary
+differential equation at a known rate, as the number of draws
+increases. However, there are some parameter regimes, such
+as very high growth rates, coupled with very high death rates,
+that can result in chaotic behavior, only in the stochastic system,
+so that average values will no longer agree. It can be hard
+to treat a unit test as a test of the code when the math
+won't always line up.
+
+If we make two fully-different implementations, we often don't
+echo all of the options and flags from one to the other, so we
+don't get good testing for all decision points. We may not
+get an exact match at each value, either.
+
+By the time we write a unit test that compares two representations
+of a system, we have refined our understanding of the behavior
+of the mathematical equations, in order to apply that expectation
+to their implementation in code. When it works, it's a strong
+affirmation. When it doesn't work, it calls into question how
+much I understand about either mathematical model or numerical
+analysis of the ensuing code. This is where a walk up the
+implementation stack for scientific code walks into questions
+about the science.
 
 
 \subsection{Regression tests}
-Not regressive at all. This is a form of regression testing.
+The simplest form of parallel implementation is to compare the output
+of a function with the output of a previous version of the same
+function. We can do this any time we make a change to a function.
+It's a form of regression testing, a reassurance that the code
+didn't get worse than it was.
 
-A regression test compares the result of a function against a previous
-result from that function. The parallel implementation, in this case,
-is the previous version of the same function.
-
-
-An easy form of parallel implementation is the previous version
-of a function. Given the task to write code, the programmer will
-start with the simplest version that does the task, and then they
-iterate to make it better. That simplest version makes an excellent
-parallel implementation for use case testing.
-
+Every form of parallel implementation mentioned above is a form
+of regression testing.
 There is a book called \emph{Release It!} that says we should
-``make regression testing easy,''~\citep{nygard2018release}. It's hard to make it easy
-because unit tests are built to test, not save output. Even if
+``make regression testing easy,''~\citep{nygard2018release}.
+It's possible to make unit tests that file away a copy of
+their output for comparison with future versions, and this is
+very handy for refactoring steps.
+The challenge is that, even if
 they save output from functions, it takes work to figure out
 \emph{how} a result changed if it did change. If the result
-is a data frame, did every value change, or some subset?
+is a data frame, every value could have changed, or some subset.
+Given which part of an output changed, the next step for the
+developer is finding the fault.
 
-While following the book's advice is a research project,
-it's a good focus for any particular project to find places in the
-code where regression tests would be most informative. Unit tests are
-most absolute in their pronouncement when they test the simplest
-functions. It's the mid-level functions, that do more work
-and produce the more complex output, that benefit from regression.
-The high-level functions will change output every time you touch
-the code, but mid-level functions will change less frequently,
-and there's a chance to guess why they changed.
+Regression tests of high-level functions raise the question
+of which, of all the low-level functions called, has a fault.
+As a result, regression testing tends to be most effective
+somewhere in the middle range of functions. That is, I test
+functions that do enough work to be interesting but not so much
+work that I can't imagine how all of the steps affect the output.
+The output of high-level functions will change every time you
+change the code, so they don't provide a good signal of problems.
 
 The benefit, and threat to efficiency for testing, is that
 parallel implementations of a function can lead to scientific
@@ -1736,6 +1838,13 @@ look at how alternative choices probe faults in code.
 
 
 \section{Testing traits of a function}
+
+
+
+\subsection{Measuring closeness}
+
+Local and global measures.
+L1 norm. Least squares. Sum of absolute value.
 
 \subsection{Continuity}
 

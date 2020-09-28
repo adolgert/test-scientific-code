@@ -46,6 +46,75 @@ number, then that, too, is a parameter for which the function
 has a known value, an exception.
 
 
+\subsubsection{Checkout testing}
+
+
+
+
+Let's say you have a cluster of computers. They are all Intel machines,
+but they come from different years. They could be different architectures
+or just different steppings of the \cpu, which is the least difference
+one can have between two chipsets. You compile code on one machine,
+or you install some \rlang package that compiles code underneath. When
+you move to another computer on another day, that same code fails
+to run with the message, ``invalid opcode.''
+
+An opcode is a machine-language instruction. The computer you used
+yesterday knew a command that's slightly too fancy for the computer
+you're using today, and it failed. You have to clean out the code
+and recompile today. It's not that the new computer is just older.
+It's still possible that, were you to switch back, there might be
+the same message again. The history of \cpu opcodes isn't a forward
+march into a larger, better set.
+
+That scenario would be annoying, and it's a headache for people
+saddled with heterogenous clusters. They solve it with, for instance,
+creating architecture-specific shared drives so that they can
+install a different version of the software for each version of
+system architecture on the cluster. That scenario is, however, a
+best case scenario.
+
+The worse scenario, and I wish this were rarer, is that the
+software runs on the other computer but gives the wrong error.
+It can fail silently. This seems like an abrogation of a compiler's
+contract with its faithful coder, but it isn't. That compiler
+ensured that the code ran well enough on one target architecture.
+The problem is that compiler optimizations at level \textsc{o3}, and above,
+are willing to make slightly riskier choices that yield great
+performance benefits. These choices are tuned to the architecture
+at hand, or as requested by compiler options, and, while they may
+run on similar architectures, carry more risk of error on them.
+It solves the problem of having languages
+that don't clearly represent time-saving invariants and of coders
+who can't afford motorcycles.
+
+There's a solution for this, too. Turn all optimizations down
+to \textsc{o2} or lower. Or claim to the compiler that the \cpu
+understands no later than the \textsc{sse2} instruction set from 2000.
+Unless you're intentionally commemorating the year Phil Katz died, you'll see
+this as a severe loss of performance.
+
+The last option to deal with this problem is called checkout,
+which is ``testing conducted in the environment to ensure that a software product performs as required after installation. (IEEE 829-2008)'' It means that you create a test to run before you
+run code on a new machine. It won't do the work of creating
+a separate version of the code, if needed, but it tells you if
+you need it. You don't generally care about integer performance
+here. You care about vectorized code and floating-point code.
+That's where the problems will be, so you can subset the test
+suite for these acceptance tests.
+
+Designating a subset of all tests as acceptance tests is an
+example of test case prioritization~\cite{rothermel1999test}.
+We prioritize tests by hand, by marking tests to be run under
+different conditions, but tests for scientific code can be lengthy,
+which makes it worth considering automatically reordering tests
+so that those that are most sensitive to correctness run by 
+themselves, or run first~\cite{yoo2012regression}.
+
+
+
+
+
 \subsubsection{Stratification and filtering}\label{sec:parameters-stratification}
 The sections above all imply that there could be some way
 to emphasize which test are chosen, based on an assessment
