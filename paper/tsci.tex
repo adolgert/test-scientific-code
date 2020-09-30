@@ -98,6 +98,12 @@ and others are particular to testing scientific code.
 % a) understand what our expectations are and b) express those
 % expectations in unit tests in c) a way that reduces risk.
 
+% Principles
+%
+% 1. No need to highlight arcane names (metamorphic, predicate).
+% 2. Use "I" and "We".
+% 3. Don't need to cover everything. (mutation testing is out).
+
 % Major sections
 % 1. Reading for risk
 % 2. Parallel implementation
@@ -553,6 +559,12 @@ Don't take one-hundred percent code coverage as a goal. Some
 projects do set a coverage goal at 70\,\% or 90\,\%, which is reasonable.
 
 
+\subsection{Testing strategy}
+
+We choose test coverage by how we read the code.
+Data flow slices, all predicates, all definitions, all
+statements, all uses of a variable, all loops.
+
 
 \section{Testing numbers}\label{sec:ieee-numbers}
 
@@ -895,12 +907,44 @@ if they were negative values or all the same value.
 We need to decide which parameter sets to test
 and how many are enough.
 
+\begin{lstlisting}
+import pytest
+from cascade.input_data.db.data_iterator import grouped_by_count
+
+@pytest.mark.parametrize("in_string,count", [
+    (list(range(11)), 5),
+    (list(range(10)), 5),
+    (list(range(9)), 5),
+    (list(), 5),
+    ([chr(x + ord("a")) for x in range(23)], 7),
+])
+def test_grouped_by_count_happy(in_string, count):
+    result = list()
+    total = set()
+    under = 0
+    for group in grouped_by_count(in_string, count):
+        result.extend(group)
+        total |= set(group)
+        assert len(group) <= count
+        assert len(group) > 0
+        if len(group) < count:
+            under += 1
+    assert len(total) == len(result)
+    assert len(total) == len(in_string)
+    assert under <= 1
+\end{lstlisting}
+
 \subsection{Equivalence classes}\label{sec:limits}\index{equivalence class}
 
 \subsubsection{Definition}
 % This is called Partition testing
 % You split by functionality, specification, requirements,
 % or you split by statement coverage, code coverage, branch coverage.
+% You can base on predicates in black box, or on code, or
+% on outputs (min value, max value, zero value).
+%
+% Maybe call boundary value analysis something different from
+% equivalence class testing. 
 % 
 % If everything in a partition fails, it is "homogeneous."
 
@@ -1206,12 +1250,23 @@ is ten, then this can be ten unit tests.
 
 Choosing so few tests won't cover all lines of code
 and will come nowhere near covering all branches in a
-large function. Using a single-coverage strategy is about
-coverage of the parameters, not coverage of the code.
-In practice, we augment where we see risk.
+large function. Even so, this single-coverage strategy
+is a very common approach because it's not too long a list
+and seems like it will give the most coverage for the
+test choices.
+
+In practice, we augment this approach with a few test cases
+in places where we see risk. For instance, it may be that
+the all-values strategy doesn't capture combinations of
+values for which an equation has no solution, or for which
+the function will raise an exception. That's fine because
+we can add them as we see fit.
 
 
 \subsubsection{All pairs}
+
+% This is the first of the "combinatorial designs." There
+% are many more. _Handbook of Combinatorial Designs_.
 
 What if we could guarantee, that if we pick any two parameters
 of a function, and we pick two values for those parameters,
@@ -1242,6 +1297,9 @@ there are two articles that offer a friendly start~\citep{blass2002,czerwoka2006
 
 \subsubsection{Orthogonal arrays}\index{orthogonal arrays}
 
+Maybe this should talk about covering arrays instead because
+an unbalanced design can work better for testing.
+
 Picture each parameter as an axis with as many marks
 on it as there are equivalence classes for that parameter.
 That's a space whose dimension is the count of parameters.
@@ -1259,6 +1317,9 @@ solutions.
 \citet{petke2015practical} cover these strategies in their book,
 and there are a few survey papers on the topic~\citep{grindal2005,nie2011survey,khalsa2014orchestrated}.
 
+Automated Combinatorial Testing for Software
+\url{https://csrc.nist.gov/projects/automated-combinatorial-testing-for-software}.
+And AETG is available on the web online.
 
 \subsubsection{Automation}
 
@@ -2560,7 +2621,7 @@ basis for testing any kind of code. I recommend starting with
 \emph{Software Testing: A Craftsman's Approach,}~\citep{jorgensen2013},
 while skipping its chapter on set theory, and then taking a look at
 \emph{Software Testing and Analysis: Process, Principles, and Techniques,}~\citep{pezze2008},
-if you haven't had enough.
+if you haven't had enough. Mathur's book is also thorough~\citep{mathur2013}.
 
 The complexity of scientific code not only makes it difficult
 to test but also mummifies past working code. Lest such a mummy
