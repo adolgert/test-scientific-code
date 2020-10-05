@@ -471,6 +471,8 @@ Path testing is a way to get a clear view of
 the code, but it's just one model for how to read code.
 
 \subsection{Data flow}
+predicate-use (P-use) versue C-use.
+
 Let's look at another piece of code, this one to integrate
 a differential equation.
 \begin{lstlisting}[numbers=left]
@@ -1907,19 +1909,27 @@ the absolute\index{absolute error} error between them is $|b-a|$, and I can writ
 test by estimating how large a difference between them is reasonable,
 given the number of calculations involved.
 \begin{lstlisting}
-assert abs(b - a) < 1e-7
+function absolute_error(a, b)
+    abs(b - a)
+end
+
+assert absolute_error(a, b) < 1e-7
 \end{lstlisting}
 Unit tests more often use relative\index{relative error} error, because it asks what
 fraction the result is of the accepted answer, $|(b - a) / a|$.
 \begin{lstlisting}
-assert abs((b - a) / a) < 1e-3
+function relative_error(a, b)
+    abs((b - a) / a)
+end
+
+assert relative_error(a, b) < 1e-3
 \end{lstlisting}
 This is particularly helpful because floating-point types carry
 significant digits. That means they offer good relative error,
 no matter whether the value is near $10^{-5}$ or $10^5$. We test
 them using the machine epsilon and relative error.
 \begin{lstlisting}
-assert abs((b - a) / a) < 1000 * machine_epsilon
+assert relative_error(a, b) < 1000 * machine_epsilon
 \end{lstlisting}
 Every language has a library function that will tell you the
 value for machine epsilon, which is the smallest fraction that
@@ -1931,11 +1941,28 @@ we could require the error between each pair of values be less
 than a given number. The easiest way to do that is by using
 what's called an $L_1$ norm, meaning we calculate the absolute error and
 look at its maximum. The same technique works for relative error.
+\begin{lstlisting}
+function l1_norm(x_vector, y_vector)
+    max(abs.(x_vector - y_vector))
+end
+
+function l2_norm(x_vector, y_vector)
+    max(abs.((x_vector - y_vector)^2))
+end
+\end{lstlisting}
 
 A more interesting question is whether two vectors are a little
 bit off from each other everywhere. To answer this question,
 we sum the absolute or relative errors and put a bound on that
-sum. 
+sum.
+\begin{lstlisting}
+function sum_of_squared_error(x_vector, y_vector)
+    total_error = 0.0
+    for i in 1:length(x_vector)
+    	total_error += (y_vector[i] - x_vector[i])^2
+    end
+end
+\end{lstlisting}
 
 
 \subsection{Continuity}
@@ -2143,6 +2170,43 @@ behavior.
 
 
 \section{Statistics for testing}\label{sec:statistical}
+
+\subsection{Stochastic functions}
+
+Some functions should produce random outputs. For instance,
+this function would tell you the time between a cow's
+third and fourth birth of a calf, given the breed, weight,
+and a random number generator.
+\begin{lstlisting}
+function parturition_duration(parity, breed, weight, rng)...end
+\end{lstlisting}
+The body of that function might come from a statistical
+survival model, or it might come from a veterinarian's estimate
+of limits to a triangular distribution. For the same parity (number of births), weight,
+and breed, it will return different times.
+
+There are a number of statistical questions we could ask about
+this function.
+\begin{itemize}
+	\item Test that the mean and standard deviation are what I expect.
+	      In the case that the distribution has known properties, I could
+	      test the output against those known properties.
+
+	\item Test whether this function gives values higher or lower
+	      than a similar function I used previously.
+\end{itemize}
+There are statistical methods to address these questions.
+
+\begin{itemize}
+	\item Develop new code.
+	\item Unit test that code to ensure it isn't broken by a change.
+	\item Regression test when writing a new version of that code,
+	      either for refactoring or for a modifcation in function.
+	\item Acceptance test, or checkout test that code.
+\end{itemize}
+
+
+
 
 \subsection{Randomized calculations should give different answers each time}
 
