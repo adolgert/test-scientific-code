@@ -2171,8 +2171,14 @@ behavior.
 
 \section{Statistics for testing}\label{sec:statistical}
 
+% You know stats and you're wondering what's special about them for unit testing.
+% You don't know stats and have a random result coming out of a function.
+
+% I want to set up in your head a) what a test is and b) what questions they answer.
+
 \subsection{Stochastic functions}
 
+% Scope. The problem in front of us.
 Some functions should produce random outputs. For instance,
 this function would tell you the time between a cow's
 third and fourth birth of a calf, given the breed, weight,
@@ -2185,27 +2191,46 @@ survival model, or it might come from a veterinarian's estimate
 of limits to a triangular distribution. For the same parity (number of births), weight,
 and breed, it will return different times.
 
-There are a number of statistical questions we could ask about
-this function.
+% Statistical tests, classes of them.
+A function like this is its own miniature experiment. We may as well
+be observing fritillary butterflies on a hedge. Our tools to
+understand and interpret this experimental data fall into a
+few categories of \emph{statistical} tests.
 \begin{itemize}
-	\item Test that the mean and standard deviation are what I expect.
-	      In the case that the distribution has known properties, I could
-	      test the output against those known properties.
+	\item A statistical test that a measure of the data matches
+	      a known value. We could ask whether the mean of the durations
+	      is what we expect from the construction of the function.
 
-	\item Test whether this function gives values higher or lower
-	      than a similar function I used previously.
+	\item A statistical test of differences between two experiments.
+	      This could be a comparison of outputs from parturition
+	      for two different cattle breeds.
+
+	\item A statistical test to characterize the shape of an
+	      association. For instance, does the duration between
+	      births increase as weight increases?
 \end{itemize}
-There are statistical methods to address these questions.
+For each of these kinds of statistical tests, there are a range of
+standard methods. We choose among those methods according to what
+our goals are for particular software tests.
+
+We're discussing functional testing of scientific code, and functional
+tests are used at various stages of development, for various reasons.
+Let's look at how needs change at different stages and, for those of
+us who aren't statisticians, give concrete examples, in \rlang,
+of safer choices to address those needs.
 
 \begin{itemize}
 	\item Develop new code.
 	\item Unit test that code to ensure it isn't broken by a change.
 	\item Regression test when writing a new version of that code,
-	      either for refactoring or for a modifcation in function.
+	      either for refactoring or for a modification in function.
 	\item Acceptance test, or checkout test that code.
 \end{itemize}
 
-
+When I first develop a new function, I'm committed to checking that
+this function gives the right answer. For the parturition distribution,
+I'm happy to run it a million times. Unless it's slow. Unless I'm checking
+$10^{-7}$ accuracy, in which case I need much more than a million times.
 
 
 \subsection{Randomized calculations should give different answers each time}
