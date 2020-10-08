@@ -2227,10 +2227,58 @@ of safer choices to address those needs.
 	\item Acceptance test, or checkout test that code.
 \end{itemize}
 
-When I first develop a new function, I'm committed to checking that
-this function gives the right answer. For the parturition distribution,
-I'm happy to run it a million times. Unless it's slow. Unless I'm checking
-$10^{-7}$ accuracy, in which case I need much more than a million times.
+When I develop new code, I have the attention and resources to ensure
+that code gives the right result. If it's a quick function, I'll collect
+ten million samples. If it's a slow function, I might let it run in a loop
+overnight. This one time, I want to know that the output matches
+something about what I was trying to write. It could be the mean and
+standard deviation of a distribution. It could be that the partition
+duration should be a linear function of the cow's weight.
+
+There isn't an official software development name for this initial test.
+It's a kind of acceptance test, but it isn't run by a client or stakeholder
+besides the author. This first test often happens in a notebook, away from
+testing harness or continuous integration tool.
+The statistics here can be simple because we are happy
+to let it run twenty minutes or twenty hours, until there is a wealth
+of data. We can use the \lstinline|mean()| or \lstinline|stdev()| functions,
+if we can generate hundreds of samples.
+
+\begin{lstlisting}[language=R]
+students-t on the mean
+\end{lstlisting}
+
+When I convert that functional test into a unit test, I can encounter
+a statistical challenge from the need for the unit test to be faster.
+If I plan to execute a similar unit test for an array of input parameters,
+then the function has to run many times per input parameter. I want that
+number to be small enough to run quickly but large enough to be precise.
+
+There is something else that is different about running a statistical
+test of a function in a unit test. When I first wrote the function,
+I wanted to know if its parameters matched what I expected. For the unit
+test, I want to know whether it is likely that its parameters no longer
+match what I expected. The null hypothesis is that the function is running
+correctly, and the alternative hypothesis is that something has changed
+to make it give the wrong result.
+
+If I set up the test to give a new, random output, each time it's run,
+then there is some probability it claims the function has a fault
+when it doesn't. This would be a false positive.
+
+\begin{lstlisting}[language=R]
+pin the random number generator
+students-t with a tighter boundary
+\end{lstlisting}
+
+I can fix that problem by finding a random seed, or a set of
+random seeds, for which the test passes. Then fix that seed.
+I have reassurance that 95\,\% of the tests pass, so the function
+works well and the statistics work well. If something about this
+function changes, and the tests no longer pass, it may be that only
+one of the twenty I run doesn't pass, but it's worth the time to
+reexamine the function.
+
 
 
 \subsection{Randomized calculations should give different answers each time}
