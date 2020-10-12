@@ -2171,11 +2171,6 @@ behavior.
 
 \section{Statistics for testing}\label{sec:statistical}
 
-% You know stats and you're wondering what's special about them for unit testing.
-% You don't know stats and have a random result coming out of a function.
-
-% I want to set up in your head a) what a test is and b) what questions they answer.
-
 \subsection{Stochastic functions}
 
 % Scope. The problem in front of us.
@@ -2184,48 +2179,59 @@ this function would tell you the time between a cow's
 third and fourth birth of a calf, given the breed, weight,
 and a random number generator.
 \begin{lstlisting}
-function parturition_duration(parity, breed, weight, rng)...end
+function parturition_duration(parity, breed, weight, rng)
+  mixture_component = rand([1, 2], p = [.7, .3], rng)
+  if (mixture_component == 1)
+    value = pdf(triangular(3 * 30, 4 * 30, 5 * 30), rng)
+  else if (mixture_component == 2)
+    value = (4 months) * (30 days / month)
+  else
+    error
+  end
+  return value
+end
 \end{lstlisting}
 The body of that function might come from a statistical
 survival model, or it might come from a veterinarian's estimate
 of limits to a triangular distribution. For the same parity (number of births), weight,
 and breed, it will return different times.
+A function like this is its own miniature experiment because the
+same inputs can lead to different outputs. While I wrote the
+code, unit testing assumes a suspicion that means I may as well
+be observing fritillary butterflies on a hedge.
 
-% Statistical tests, classes of them.
-A function like this is its own miniature experiment. We may as well
-be observing fritillary butterflies on a hedge. Our tools to
-understand and interpret this experimental data fall into a
-few categories of \emph{statistical} tests.
-\begin{itemize}
-	\item A statistical test that a measure of the data matches
-	      a known value. We could ask whether the mean of the durations
-	      is what we expect from the construction of the function.
+If I run the parturition function, above, twenty times, the
+average value should be near four months.
+\begin{lstlisting}
+[110.2 134.7 133.9]
+\end{lstlisting}
+The practical problem
+is that sometimes the average value will be almost five months,
+just because of the draw of random numbers. If we use hypothesis
+testing methods from statistics, we can gain control over how
+often the average will be wildly askew. We can choose testing
+limits to ensure it fails five percent of the time, but it will
+still give us the wrong answer five percent of the time.
 
-	\item A statistical test of differences between two experiments.
-	      This could be a comparison of outputs from parturition
-	      for two different cattle breeds.
+If I run the parturition function twenty thousand times, even then,
+how do I know it's doing what I want it do do? We ran into this
+problem before, that it can take some searching to match a
+function output to expectations. I can average values. I can
+say that none are below three months or above five months.
+There are statistical measures that provide some confidence about
+traits of a random function, traits to match against expectations.
 
-	\item A statistical test to characterize the shape of an
-	      association. For instance, does the duration between
-	      births increase as weight increases?
-\end{itemize}
-For each of these kinds of statistical tests, there are a range of
-standard methods. We choose among those methods according to what
-our goals are for particular software tests.
+Statistics books show lists of measures and hypothesis tests
+for various situations and then say you have to choose the
+method based on the question you need to answer. Functional tests
+are used to answer different questions at different stages
+of software development, maintenance, and deployment. This section
+will use those stages to identify goals. There will be some
+concrete examples, in \rlang, but I hope to emphasize when
+and how statistical tools will help.
 
-We're discussing functional testing of scientific code, and functional
-tests are used at various stages of development, for various reasons.
-Let's look at how needs change at different stages and, for those of
-us who aren't statisticians, give concrete examples, in \rlang,
-of safer choices to address those needs.
 
-\begin{itemize}
-	\item Develop new code.
-	\item Unit test that code to ensure it isn't broken by a change.
-	\item Regression test when writing a new version of that code,
-	      either for refactoring or for a modification in function.
-	\item Acceptance test, or checkout test that code.
-\end{itemize}
+\subsection{Initial development}
 
 When I develop new code, I have the attention and resources to ensure
 that code gives the right result. If it's a quick function, I'll collect
@@ -2241,44 +2247,53 @@ besides the author. This first test often happens in a notebook, away from
 testing harness or continuous integration tool.
 The statistics here can be simple because we are happy
 to let it run twenty minutes or twenty hours, until there is a wealth
-of data. We can use the \lstinline|mean()| or \lstinline|stdev()| functions,
-if we can generate hundreds of samples.
+of data.
 
-\begin{lstlisting}[language=R]
-students-t on the mean
-\end{lstlisting}
+\begin{itemize}
+    \item Mean and variance
+    \item Trimmed mean and its variance
+    \item M-estimator and its variance
+    \item Quantiles, Kolmogorov distance
+    \item Pearson's coefficient, other associations
+\end{itemize}
 
+
+\subsection{Unit test}
 When I convert that functional test into a unit test, I can encounter
 a statistical challenge from the need for the unit test to be faster.
 If I plan to execute a similar unit test for an array of input parameters,
 then the function has to run many times per input parameter. I want that
 number to be small enough to run quickly but large enough to be precise.
 
-There is something else that is different about running a statistical
-test of a function in a unit test. When I first wrote the function,
-I wanted to know if its parameters matched what I expected. For the unit
-test, I want to know whether it is likely that its parameters no longer
-match what I expected. The null hypothesis is that the function is running
-correctly, and the alternative hypothesis is that something has changed
-to make it give the wrong result.
+If you test by a cut, the size of the cut determines type-i and type-ii error.
+Statistical hypothesis tests tell you the likelihood of those errors.
+Coverage is the fraction of times that it succeeds, given type-i error.
 
-If I set up the test to give a new, random output, each time it's run,
-then there is some probability it claims the function has a fault
-when it doesn't. This would be a false positive.
+We avoid this question, somewhat, by pinning random seeds and being
+willing to re-investigate when the tests fail.
+Set alpha large. Find a test that passes. Then bring the cut in,
+so that power is high.
 
-\begin{lstlisting}[language=R]
-pin the random number generator
-students-t with a tighter boundary
-\end{lstlisting}
+\begin{itemize}
+    \item Simple cut
+    \item Students-t (one-sample, two-sample)
+    \item Percentile bootstrap-t
+\end{itemize}
 
-I can fix that problem by finding a random seed, or a set of
-random seeds, for which the test passes. Then fix that seed.
-I have reassurance that 95\,\% of the tests pass, so the function
-works well and the statistics work well. If something about this
-function changes, and the tests no longer pass, it may be that only
-one of the twenty I run doesn't pass, but it's worth the time to
-reexamine the function.
 
+\subsection{Regression testing}
+
+\begin{itemize}
+    \item Trimmed mean again.
+    \item Ranked comparison.
+\end{itemize}
+
+
+\subsection{Acceptance testing and checkout testing}
+
+Asks for more precise stats for acceptance testing.
+
+Needs new seeds for checkout when libraries change.
 
 
 \subsection{Randomized calculations should give different answers each time}
