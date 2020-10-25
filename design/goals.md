@@ -51,9 +51,12 @@ Unit testing frameworks get used for all kinds of testing purposes.
 Literature on testability points out that there are many 
 influences on whether code can be tested.
 
-* Unit testing framework
-* Language features
-* ...there are six of these, in my notes.
+* Clarity of requirements
+* Implementation choices in th ecode.
+* Testing capabilities built into the language.
+* The test suite.
+* Unit testing framework and test support environment.
+* The software process.
 
 
 # User-level features
