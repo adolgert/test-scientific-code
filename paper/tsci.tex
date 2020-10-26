@@ -2180,7 +2180,16 @@ a small initial insect population will tend to increase until
 it reaches a carrying capacity. If the population is above carrying
 capacity, individuals will die at a higher rate until it is lowered.
 For this example, we theorize that the carrying capacity changes
-randomly and the population responds to those changes.
+randomly and the population responds to those changes. This
+means the population will rise and then bounce around
+some average value, as shown in Fig.~\ref{fig:insectrise}.
+
+\begin{figure}
+\centering\includegraphics[width=4in]{insects_rise.pdf}
+\caption{This is a stochastic model of the growth of a
+population, where the population's carrying capacity changes
+randomly with each time step. It rises in fits and starts.\label{fig:insectrise}}
+\end{figure}
 
 \begin{lstlisting}
 beverton_holt(x, K, nu) = (nu * K * x) / (K + (nu - 1) * x)
@@ -2209,59 +2218,56 @@ random carrying capacity, I don't know what values it should
 produce, but they should be both above and below the carrying
 capacity, not quite centered on it because growth is exponential.
 
-\begin{figure}
-\centering\includegraphics[width=4in]{insects_rise.pdf}
-\caption{This is a stochastic model of the growth of a
-population, where the population's carrying capacity changes
-randomly with each time step. It rises in fits and starts.}
-\end{figure}
+There are two problems, then, for testing this function.
+One is that every time I run the function, it will return a different
+set of results. The other is that, as we have seen for deterministic
+scientific code, I don't know exactly what the mean of the
+distribution of values should be. I have only expectations about how
+this function should relate to other functions.
+
+We're going to reach for some statistical tools to help
+to characterize the output of random functions. The main
+contribution here is to clarify how software tests are used
+at different stages of software development. Clear goals
+make for better use of statistical tests. Before covering
+those stages, we use the nymphs to remind ourselves of the
+basic statistics.
+
+\subsection{Statistics primer}
+
+When a function has a random output, that function has
+a true distribution, and the output is a sample of it.
+We use the output to infer the probability that the true
+distribution has some property.
+
+For instance, the aquatic life stages, above, give us a
+time series. We could look at the behavior of those stages
+over long times, as shown in Fig.~\ref{fig:insectlong}.
+The population size bounces around some average value,
+forgetting its initial starting size.
+If we exclude the first thousand time steps, we can look
+at the distribution of population sizes, binned as a histogram
+in Fig.~\ref{fig:insecthist}. This is the distribution of
+population sizes from a single call to the function.
 
 \begin{figure}
 \centering\includegraphics[width=4in]{insects_long.pdf}
 \caption{Over longer times, the early rise in the population
-is less important. The population varies around some average value.}
+is less important. The population varies around some average value.\label{fig:insectlong}}
 \end{figure}
-
-
 \begin{figure}
 \centering\includegraphics[width=4in]{insects_histogram_4k.pdf}
 \caption{If we focus on long-time behavior and ask how often
 the population is any given size, this function, for these
-parameters, produces a particular distribution of sizes.}
+parameters, produces a particular distribution of sizes.\label{fig:insecthist}}
 \end{figure}
 
-If I run the parturition function, above, twenty times, the
-average value should be near four months.
-\begin{lstlisting}
-[110.2 134.7 133.9]
-\end{lstlisting}
+The code in the function will tend to produce population sizes
+that have some distribution. Each time we run it, the sample
+population sizes will approximate the function's underlying
+distribution. If we introduce a fault in the function, or if
+it already had a fault, 
 
-The practical problem
-is that sometimes the average value will be almost five months,
-just because of the draw of random numbers. If we use hypothesis
-testing methods from statistics, we can gain control over how
-often the average will be wildly askew. We can choose testing
-limits to ensure it fails five percent of the time, but it will
-still give us the wrong answer five percent of the time.
-
-If I run the parturition function twenty thousand times, even then,
-how do I know it's doing what I want it do do? We ran into this
-problem before, that it can take some searching to match a
-function output to expectations. I can average values. I can
-say that none are below three months or above five months.
-There are statistical measures that provide some confidence about
-traits of a random function, traits to match against expectations.
-
-Statistics books show lists of measures and hypothesis tests
-for various situations and then say you have to choose the
-method based on the question you need to answer. Functional tests
-are used to answer different questions at different stages
-of software development, maintenance, and deployment. This section
-will use those stages to identify goals. There will be some
-concrete examples, in \rlang, but I hope to emphasize when
-and how statistical tools will help.
-
-\subsection{Statistics primer}
 
 \subsection{Initial development}
 
