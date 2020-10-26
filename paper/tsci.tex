@@ -2173,41 +2173,69 @@ behavior.
 
 \subsection{Stochastic functions}
 
-Aquatic stage of insect. Stochastic food level. Input
-new larvae. Output immature adults.
-
 % Scope. The problem in front of us.
-Some functions should produce random outputs. For instance,
-this function would tell you the time between a cow's
-third and fourth birth of a calf, given the breed, weight,
-and a random number generator.
+Some functions should produce random outputs. Take, for instance,
+this model of an aquatic life stage for insects. We assume that
+a small initial insect population will tend to increase until
+it reaches a carrying capacity. If the population is above carrying
+capacity, individuals will die at a higher rate until it is lowered.
+For this example, we theorize that the carrying capacity changes
+randomly and the population responds to those changes.
+
 \begin{lstlisting}
-function parturition_duration(parity, breed, weight, rng)
-  mixture_component = rand([1, 2], p = [.7, .3], rng)
-  if (mixture_component == 1)
-    value = pdf(triangular(3 * 30, 4 * 30, 5 * 30), rng)
-  else if (mixture_component == 2)
-    value = (4 months) * (30 days / month)
-  else
-    error
-  end
-  return value
+beverton_holt(x, K, nu) = (nu * K * x) / (K + (nu - 1) * x)
+
+function beverton_holt_stochastic(young, carrying, params, step_cnt, rng)
+    carrying = zeros(Float64, step_cnt)
+    alpha, beta = [params[:food_alpha], params[:food_beta]]
+    rand!(rng, Distributions.Beta(alpha, beta), carrying)
+    carrying .*= params[:max_carrying]
+
+    x = zeros(Float64, step_cnt)
+    x[1] = young
+    for step_idx = 1:(step_cnt - 1)
+        x[step_idx + 1] = beverton_holt(
+            x[step_idx], carrying[step_idx], params[:growth_rate]
+            )
+    end
+    x
 end
 \end{lstlisting}
-The body of that function might come from a statistical
-survival model, or it might come from a veterinarian's estimate
-of limits to a triangular distribution. For the same parity (number of births), weight,
-and breed, it will return different times.
-A function like this is its own miniature experiment because the
-same inputs can lead to different outputs. While I wrote the
-code, unit testing assumes a suspicion that means I may as well
-be observing fritillary butterflies on a hedge.
+
+A function like this is its own miniature experiment. If the
+carrying capacity were constant, the result would be a
+discrete-time approximation to a logistic function. Given the
+random carrying capacity, I don't know what values it should
+produce, but they should be both above and below the carrying
+capacity, not quite centered on it because growth is exponential.
+
+\begin{figure}
+\centering\includegraphics[width=4in]{insects_rise.pdf}
+\caption{This is a stochastic model of the growth of a
+population, where the population's carrying capacity changes
+randomly with each time step. It rises in fits and starts.}
+\end{figure}
+
+\begin{figure}
+\centering\includegraphics[width=4in]{insects_long.pdf}
+\caption{Over longer times, the early rise in the population
+is less important. The population varies around some average value.}
+\end{figure}
+
+
+\begin{figure}
+\centering\includegraphics[width=4in]{insects_histogram_4k.pdf}
+\caption{If we focus on long-time behavior and ask how often
+the population is any given size, this function, for these
+parameters, produces a particular distribution of sizes.}
+\end{figure}
 
 If I run the parturition function, above, twenty times, the
 average value should be near four months.
 \begin{lstlisting}
 [110.2 134.7 133.9]
 \end{lstlisting}
+
 The practical problem
 is that sometimes the average value will be almost five months,
 just because of the draw of random numbers. If we use hypothesis

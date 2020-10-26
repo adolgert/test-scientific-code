@@ -52,6 +52,16 @@ function beverton_holt_constant_food(young, step_cnt, params)
     x
 end
 
+function beverton_holt_carrying(young, carrying, growth_rate, step_cnt)
+    x = zeros(Float64, step_cnt)
+    x[1] = young
+    for step_idx = 1:(step_cnt - 1)
+        x[step_idx + 1] = ((growth_rate * carrying[step_idx] * x[step_idx]) /
+            (carrying[step_idx] + (growth_rate - 1) * x[step_idx]))
+    end
+    x
+end
+
 
 @doc raw"""
     forecast_population(young, step_cnt, params, rng)
@@ -80,8 +90,28 @@ function run_pop()
         :max_food => 400,
         :food_alpha => 2,
         :food_beta => 10,
-        :growth_rate => 1.5,
-        :death_rate => 1.05
+        :growth_rate => 1.02,
+        :death_rate => 1.02
     )
-    forecast_population(2, 200, parameters, rng)
+    forecast_population(2, 5000, parameters, rng)
+end
+
+
+function paperfig(fn)
+    savefig(fn * ".pdf")
+    savefig(fn * ".png")
+end
+
+
+function make_plots()
+    y = run_pop()
+
+    histogram(y[1000:5000])
+    paperfig("insects_histogram_4k")
+
+    plot(y[1:500])
+    paperfig("insects_rise")
+
+    plot(y[1:5000])
+    paperfig("insects_long")
 end
