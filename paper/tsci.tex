@@ -2266,122 +2266,46 @@ The code in the function will tend to produce population sizes
 that have some distribution. Each time we run it, the sample
 population sizes will approximate the function's underlying
 distribution. If we introduce a fault in the function, or if
-it already had a fault, 
+it already had a fault, then the underlying distribution will shift,
+but it may not be apparent from the samples that the underlying distribution
+has shifted.
 
+We approach this problem by reducing the problem to a simpler one.
+Instead of asking whether the whole distribution of answers is different,
+we measure one property of the distribution, and ask whether it is different.
+Each of these properties is a single number, called a statistic.
+There are three kinds of statistics that are standard: measures of
+location, measures of spread, and measures of association.
 
-\subsection{Initial development}
-
-When I develop new code, I have the attention and resources to ensure
-that code gives the right result. If it's a quick function, I'll collect
-ten million samples. If it's a slow function, I might let it run in a loop
-overnight. This one time, I want to know that the output matches
-something about what I was trying to write. It could be the mean and
-standard deviation of a distribution. It could be that the partition
-duration should be a linear function of the cow's weight.
-
-There isn't an official software development name for this initial test.
-It's a kind of acceptance test, but it isn't run by a client or stakeholder
-besides the author. This first test often happens in a notebook, away from
-testing harness or continuous integration tool.
-The statistics here can be simple because we are happy
-to let it run twenty minutes or twenty hours, until there is a wealth
-of data.
-
-\begin{itemize}
-    \item Mean and variance
-    \item Trimmed mean and its variance
-    \item M-estimator and its variance
-    \item Quantiles, Kolmogorov distance
-    \item Pearson's coefficient, other associations
-\end{itemize}
-
-
-\subsection{Unit test}
-When I convert that functional test into a unit test, I can encounter
-a statistical challenge from the need for the unit test to be faster.
-If I plan to execute a similar unit test for an array of input parameters,
-then the function has to run many times per input parameter. I want that
-number to be small enough to run quickly but large enough to be precise.
-
-If you test by a cut, the size of the cut determines type-i and type-ii error.
-Statistical hypothesis tests tell you the likelihood of those errors.
-Coverage is the fraction of times that it succeeds, given type-i error.
-
-We avoid this question, somewhat, by pinning random seeds and being
-willing to re-investigate when the tests fail.
-Set alpha large. Find a test that passes. Then bring the cut in,
-so that power is high.
-
-\begin{itemize}
-    \item Simple cut
-    \item Students-t (one-sample, two-sample)
-    \item Percentile bootstrap-t
-\end{itemize}
-
-
-\subsection{Regression testing}
-
-\begin{itemize}
-    \item Trimmed mean again.
-    \item Ranked comparison.
-\end{itemize}
-
-
-\subsection{Acceptance testing and checkout testing}
-
-Asks for more precise stats for acceptance testing.
-
-Needs new seeds for checkout when libraries change.
-
-
-\subsection{Randomized calculations should give different answers each time}
-
-A simple Gaussian elimination can benefit from random pivoting.
-A function to sample a distribution is supposed to return a new value
-every time it's called.
-Some functions introduce random reorderings
-so they can insist that the caller not expect a given order
-in the output. All of these perfectly useful functions
-thwart using simple lookup tables to test their output.
-
-The tests, themselves, can be the problem when we randomly
-generate test cases. I'll check
-a life expectancy function against a corpus of life expectancies
-for every country. I'll randomly generate user input
-to see that a functions succeeds or gracefully fails.
-
-When testing these random functions,
-we have on our side some basic tools
-of statistics. Some, like mean square error, are ways
-to heap our uncertainty into a single, tidy number.
-Others are formal statistical
-tests. They take a clear side-effect of a function,
-its randomness, and tame it to measurable uncertainty.
-Let's look at just a few examples.
-
-\subsection{Approaches}
-
-\subsubsection{Error estimation}
-When the function under test returns a vector of values,
-and I want to compare it with a vector of known values,
-I use an estimator, like mean-squared error, of the difference
-between the two.
-
-The mean-squared error between $N$ observed values $\hat{Y}$ and $N$ known values $Y$ is $\frac{1}{N}\sum_i (Y_i - \hat{Y}_i)^2$.
-It takes the whole set of values and reduces it to one number I can assert must be less than some value.
-
-When values range from small to large, it's convenient to use
-relative error instead of absolute error.
+\subsubsection{Measures of location}
+The most common measures of location are the mean and median of the distribution.
+The mean is the average value. For the function, there is one true
+mean. Each time we generate samples, we estimate the mean using
 \begin{equation}
-  \mbox{relerr} = \frac{\hat{Y}_i - Y_i}{Y_i}
+  \mbox{mean}(\hat{Y}) = \frac{1}{N}\sum_i{\hat{Y}_i}
 \end{equation}
-The known value is always in the denominator.
+The hat that turns $Y$ into $\hat{Y}$ indicates that we are looking at samples.
+In \rlang, it's as simple as \lstinline!mean(y)! for an array of values.
 
-Even more reassuring for a unit test, I can take all of the
-sets of values and take the maximum absolute error,
-$\mbox{max}_i |Y_i-\hat{Y}_i|$. That's a guarantee there isn't
-some boundary value whose crazy-high error is hidden beneath
-low error everywhere else.
+If we sort the $\hat{Y}_i$, then we can identify quantiles, where the
+5\,\% quantile is the value 5\,\% down the sorted list. There is some
+ambiguity here, depending on whether the list divides evenly into the
+quantile, and statisticians, in their passion for correctness, have identified
+seven different ways to count a quantile. All of them are available
+in the the \rlang \lstinline!quantile(y, percents)! function.
+The most important quantile, though, is the median, which is 50\,\%
+down the sorted list. Sometimes this can be more stable when the
+stochastic function occasionally gives very large or small values.
+The median and the mean are, in general different values.
+
+Show measures of location on the example.
+
+Each run of the stochastic function will return different samples
+with a different mean. The more samples there are, the closer
+the mean will tend to be to the mean of the underlying function.
+There is a rule that says that if you want the mean of the samples
+to be ten times more accurate, then you need to draw a hundred times
+more samples.
 
 \subsubsection{Variance, standard deviation}
 When there is just one vector of random numbers coming out
@@ -2390,7 +2314,7 @@ they are from their average value. The variance is
 the average of how far each value is from the average of all
 values,
 \begin{equation}
-  \mbox{var}(Y) = \frac{1}{N}\sum_i (Y_i - \bar{Y})^2,
+  \mbox{var}(\hat{Y}) = \frac{1}{N}\sum_i (\hat{Y}_i - \bar{Y})^2,
 \end{equation}
 but you'd use the always-avaiable
 as \lstinline!var! or \lstinline!variance! in any language.
@@ -2403,6 +2327,37 @@ the value of the variance will keep increasing as the
 number of draws of the function increases, instead of
 converging to a single value. This, in itself, is a
 testable property of a function.
+
+\subsubsection{Measures of association}
+
+Let's say the output of a function is a set of $y$ values,
+and the input is a set of $x$ values. You may not know
+how $y$ depends on $x$ exactly, but you know that it
+does. The Pearson coefficient is a function of
+$N$ $y$ values and $N$ $x$ values that will return a number
+between -1 and 1, where -1 is a line with a downward slope,
+1 is a line with an upward slope, and 0 means the points
+are evenly arranged so that they don't slope up or down
+and aren't collinear.
+
+For a single $y$ that depends on a single $x$, the equation
+is a few lines of code.
+\begin{equation}
+r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
+\end{equation}
+It conveniently generalizes to more dimensions.
+
+The Pearson coefficient is a handy, if imprecise,
+set of guard rails on the behavior of a function.
+It quickly determines whether the output rises or falls with the input,
+even in the presence of noise. It can say whether the output
+isn't linear enough, or whether it's too linear.
+It even has a multidimensional generalization for data that
+has multiple $x$ and $y$ values.
+
+Apply Pearson to early behavior of the example.
+
+Kolmogorov distance. Empirical distribution function?
 
 
 \subsubsection{Confidence interval}
@@ -2429,34 +2384,64 @@ close to the average good value. On the other hand, we don't
 want it to fail a lot. The standard deviation tells us
 how much push luck in either direction.
 
-\subsubsection{Pearson coefficient}
-Let's say the output of a function is a set of $y$ values,
-and the input is a set of $x$ values. You may not know
-how $y$ depends on $x$ exactly, but you know that it
-does. The Pearson coefficient is a function of
-$N$ $y$ values and $N$ $x$ values that will return a number
-between -1 and 1, where -1 is a line with a downward slope,
-1 is a line with an upward slope, and 0 means the points
-are evenly arranged so that they don't slope up or down
-and aren't collinear.
 
-For a single $y$ that depends on a single $x$, the equation
-is a few lines of code.
-\begin{equation}
-r_{xy} = \frac{\sum_i (x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum_i (x_i - \bar{x})^2}\sqrt{\sum_i(y_i - \bar{y})^2}}
-\end{equation}
-It conveniently generalizes to more dimensions.
+\subsection{Initial development}
 
-The Pearson coefficient is a handy, if imprecise,
-set of guard rails on the behavior of a function.
-It quickly determines whether the output rises or falls with the input,
-even in the presence of noise. It can say whether the output
-isn't linear enough, or whether it's too linear.
-It even has a multidimensional generalization for data that
-has multiple $x$ and $y$ values.
+I don't know a name for the testing we do during initial development
+of software. Whether I work in an electronic notebook, or an integrated
+development environment, or on the command-line, I develop code using
+a combination of functions and free code, with lots of plots to answer
+lots of questions. There is certainly testing that happens at this stage,
+and it's kind of an acceptance test, but it isn't run by a client or
+stakeholder besides the author. It's the only testing some code will ever have.
+
+There are two challenges during this stage of software development,
+and they complicate each other. The first is that the goal of this testing
+is to answer the question of whether the distribution of the underlying
+function matches some known model. This could be a classic hypothesis test,
+where the null hypothesis would be that the mean of a distribution has a
+particular value, and we sample the function in order to gather evidence
+to support the hypothesis that, for instance, the mean is higher (a one-sided test) or
+differs (a two-sided test).
+
+The good news is that, at this stage, the developer is committed to
+ensuring this first writing of the code is correct. If it takes a day
+to collect a million samples, then that could be reasonable. More samples
+gives the test more power. The variance of the mean will become small,
+and maybe that can reduce the risk that the function is incorrect.
+
+The bad news is the second challenge. Like any other scientific code,
+the code in a stochastic function doesn't necessarily have a particular
+known true value for a statistic. That means we have to resort to the
+other methods for testing scientific software, such as comparing
+different versions of a function or looking at traits of a the function.
+Does the answer go down when a particular parameter goes up? When a parameter
+reaches a particular, limiting value, does the distribution take a known
+shape? We not only have to write tests that capture our expectations
+about a function, we have to do it in circumstances that say that, sometimes,
+the test will give the wrong answer.
+
+Given the context of initial development of a function, it's reasonable
+to compute the coverage of a test. Run a 95\,\% coverage hypothesis test a hundred times
+and ask whether about five of them fail. Time and attention are
+an advantage here.
 
 
-\subsection{Taming randomness}
+\subsection{Unit test}
+When I convert that functional test into a unit test, I can encounter
+a statistical challenge from the need for the unit test to be faster.
+If I plan to execute a similar unit test for an array of input parameters,
+then the function has to run many times per input parameter. I want that
+number to be small enough to run quickly but large enough to be precise.
+
+If you test by a cut, the size of the cut determines type-i and type-ii error.
+Statistical hypothesis tests tell you the likelihood of those errors.
+Coverage is the fraction of times that it succeeds, given type-i error.
+
+We avoid this question, somewhat, by pinning random seeds and being
+willing to re-investigate when the tests fail.
+Set alpha large. Find a test that passes. Then bring the cut in,
+so that power is high.
 
 I make tests with random inputs, so they explore more alternative
 paths in the code than I might guess. I run tests of random
@@ -2512,26 +2497,100 @@ the test within some tolerance. This is less simple, but it
 explores the space of tests and is likely to signal when
 a real fault arrives.
 
+
+\subsection{Regression testing}
+
+We use regression testing to ask whether a function's output has changed.
+There is a former version of a function producing samples $A$ and a current
+version of a function producing samples $B$. We construct a statistical
+test to ask, for instance, whether the mean of $B$ differs from the mean of $A$.
+
+As before, there are poor man's versions of these. For instance, we could
+measure a statistic of $A$ very well and ask only whether $B$ agrees.
+We could look at the values and decide, off the cuff, whether they are close
+enough.
+
+I'd like to emphasize here that, when doing comparison of two sets of samples,
+we have an advantage over other goals. We don't have to use the mean and
+variance. We can use more robust measures.
+
+The trimmed mean is a statistic that sorts the samples, throws out
+the top few and bottom few, and then takes the mean. For long-tailed
+distributions, this can be much less susceptible to outliers. In \rlang,
+this is built in as \lstinline!mean(y, trim = 0.2)! for a 20\,\% trimmed mean.
+
+Hubert's M-estimator is similarly robust to outliers. For some distributions
+it can be more stable than the trimmed mean. In \rlang, this is \lstinline!???!.
+
+In both cases, if the function is slow to run, so that the unit tests
+have time to collect few samples, it can be helpful to use a bootstrap
+to estimate a statistic. Bootstrap techniques deal better with distributions
+that aren't Gaussian. In \rlang, a percentile boostrap-t to estimate
+a trimmed mean would be \lstinline!boot(mean)!.
+
+If that kind of testing doesn't seem well-behaved, it's reasonable
+to try ranked comparison.
+
+All of these robust methods can be applied to unit tests, as well.
+They require more computation from the statistics functions but
+get more value out of each call to the function-under-test.
+
+Lastly, regression testing of stochastic functions can benefit from
+techniques called variance reduction. These are methods that artificially
+reduce the variance of $\hat{B}_i-\hat{A}_i$ while giving a correct
+result for measures of association for $\hat{B}_i-\hat{A}_i$. A simple example
+is to make a copy of the random number generator. Then pass the same
+random number generator into both versions of the function. If those
+functions are sufficiently similar, if they make the same calls to the
+generator in the same order, then using copies of the generator will
+make their results more similar.
+
+For one version of regression testing, you could ask whether the results
+are exactly the same, given the same random seeds. That would
+be reassuring.
+
+
+\subsection{Acceptance testing and checkout testing}
+
+I'll mention two more kinds of testing, checkout tests and acceptance tests.
+
+A checkout test is a quick test that runs before doing computation on a new
+computer, or after each compilation. It's especially useful when working on
+a heterogeneous cluster, where different computers have different \cpu{}s or
+different compiler flags. I'm doing a quick look for problems caused by
+compiling for one architecture and running on a slightly different architecture.
+There is a constraint on these tests to run quickly, but the question is
+whether the answers are correct.
+
+An acceptance test asks the same question we asked at the start of
+the software process. Does this software give the correct results when
+I give it a good, hard look? These tests often take a while to run and,
+in the case of stochastic functions, will gather enough samples to have
+good power.
+
+In both cases, I can't expect that the test will yield the same answers
+every time I run it. A change in compilers can change rounding modes
+for floating point. A change in how code is linked can change the
+random number generator. I can't rely on pinned seeds. There will
+be a chance that tests fail with a type-i or type-ii error. I can minimize
+those chances by using appropriate hypothesis tests. I can't make the
+randomness go away.
+
+
 \subsection{Conclusion}
 
-Some kinds of unit tests are absolute. When they pass,
-there is no fault in this one path through the function.
-Statistical tests don't give that guarantee. The function
-under test could be close-enough to the desired value but
-still have a fault in some code path.
-At the same time, statistical tests can find faults
-in places you weren't looking, because they summarize all
-of the outputs of a function or because they summarize
-the behavior of multiple runs of a function.
+As with all testing, testing of random functions is about finding the
+appropriate strategies to reduce risk. Our chief method for simplifying
+these tests is to be clear about the testing goal at each stage of
+software development. During early development, sample so much that
+the variance is small. During unit tests, find random seeds that are
+within confidence intervals and pin them. During regression testing,
+choose robust estimators with variance reduction.
 
-If we were testing a typical function, for which we knew the
-right answer, that unit test would offer the meager assurance that,
-for one set of parameters, the function is correct.
-Statistical tests, like those above and many more statistical
-tests not mentioned, can assert that, for one set of parameters,
-a function isn't too wrong.
-
-
+There is no way to avoid proper statistics, however. As with other
+challenges for testing scientific software, I test well when I know
+the function-under-test well enough to quantify my expectations
+about its behavior.
 
 
 
