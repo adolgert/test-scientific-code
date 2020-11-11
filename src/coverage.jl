@@ -1,4 +1,4 @@
-using Combinatorics
+using Combinatorics: combinations
 
 a = Set{NTuple{3,Int8}}()
 push!(a, (3, 7, 4))
@@ -76,7 +76,7 @@ function initialize_tracker(tracker, seed)
 end
 
 # These are combinations per possible value of each parameter.
-# For instance, [2,3,4]. it would be [7, 6, 5] for 2-way. Which means total combinations are [14, 12, 10].
+# For instance, [2,3,4]. it would be [7, 6, 5] for 2-way.
 function possible_combinations(n_way, param_size)
     param_cnt = length(param_size)
     combinations = zeros(Int, param_cnt)
@@ -88,6 +88,11 @@ function possible_combinations(n_way, param_size)
         combinations[comb_idx] = total
     end
     combinations
+end
+
+function total_combinations(arity, n_way)
+    param_cnt = length(arity)
+    sum(prod(arity[key_set]) for key_set in combinations(1:param_cnt, n_way))
 end
 
 n_way = 2
@@ -117,7 +122,13 @@ given = [0 0 2 0 1]
 # this is 3-way, and only 1 is known.
 # For each combination, try it with the same other values but a
 # different one of this value. See if it exists.
-collect(Combinatorics.combinations([1,3,5], 2))
+collect(Combinatorics.combinations([1,3,5,7], 2))
+
+# Are all combinations covered?
+# Which variable has the most combinations remaining to cover?
+# Which value of this variable is most uncovered?
+# Given a string of variable values, what value of this variable maximizes
+#  uncovered sets -or if none- participates in the most uncovered sets.
 
 # Pseudocode
 # while not all combinations covered
@@ -127,6 +138,49 @@ collect(Combinatorics.combinations([1,3,5], 2))
 #     for next variable in a sample order
 #       choose a value that's least covered, given previous values.
 
+function next_multiplicative!(values, arity)
+    carry = 1
+    for slot_idx in length(values):-1:1
+        values[slot_idx] += carry
+        if arity[slot_idx] < values[slot_idx]
+            values[slot_idx] = 1
+            carry = 1
+        else
+            carry = 0
+        end
+    end
+end
+vv = [1,1,1]
+nmarity = [2,3,2]
+for i in 1:prod(nmarity)
+    next_multiplicative!(vv, nmarity)
+    print(vv)
+end
+
+# This represents possible coverage as a matrix, one column per parameter,
+# zero if not used.
+function all_combinations(arity, n_way)
+    v_cnt = length(arity)
+    indices = collect(combinations(1:v_cnt, n_way))
+    combinations_cnt = total_combinations(arity, n_way)
+
+    coverage = zeros(Int, combinations_cnt, v_cnt)
+    idx = 1
+    for indices_idx in 1:size(indices, 1)
+        offset = indices[indices_idx]
+        sub_arity = arity[offset]
+        sub_cnt = prod(sub_arity)
+        values = copy(sub_arity)
+        for sub_idx in 1:sub_cnt
+            next_multiplicative!(values, sub_arity)
+            coverage[idx, offset] = values
+            idx += 1
+        end
+    end
+    coverage
+end
+
+all_combinations([2,3,2], 2)
 
 incoming_idx = 1
 bit_nonzero = seed[incoming_idx, :] .!= 0
@@ -143,5 +197,6 @@ for incoming_idx in 1:size(seed, 1)
     values = NTuple{n_way,Int8}(seed[incoming_idx, bit_nonzero])
     push!(ad[idx], values)
 end
+
 ad
 
