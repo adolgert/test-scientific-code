@@ -1,0 +1,170 @@
+using Test
+
+### total_combinations
+tc_trials = [
+    [[2, 2, 2], 2, 12],
+    [[2, 3, 2], 2, 16],
+    [[2, 3, 2, 2], 2, 6+4+4+6+6+4],
+    [[2, 3, 2, 2], 3, 12+12+8+12]
+]
+for trial in tc_trials
+    res = total_combinations(trial[1], trial[2])
+    @test res == trial[3]
+end
+
+### next_multiplicative
+arity0 = [3, 7, 9, 4]
+vv0 = copy(arity0)
+next_multiplicative!(vv0, arity0)
+@test vv0 == [1, 1, 1, 1]
+vv = [1,1,1]
+nmarity = [2,3,2]
+for i in 1:prod(nmarity)
+    next_multiplicative!(vv, nmarity)
+end
+@test vv == [1, 1, 1]
+
+
+### all_combinations
+rng = MersenneTwister(9237425)
+for ac_trial_idx in 1:5
+    n_way = [2, 3, 4][rand(rng, 1:3)]
+    param_cnt = rand(rng, (n_way + 1):(n_way + 3))
+    arity = rand(rng, 2:4, param_cnt)
+    coverage = all_combinations(arity, n_way)
+    # It has the right column dimnsion.
+    @test size(coverage, 2) == length(arity)
+    # Every combination is nonzero.
+    @test sum(sum(coverage, dims = 2) == 0) == 0
+    # The total number of combinations agrees with expectations.
+    @test total_combinations(arity, n_way) == size(coverage, 1)
+    # Generate some random combinations and check that they are in there.
+    for comb_idx in 1:100
+        comb = [rand(rng, 1:arity[cj]) for cj in 1:param_cnt]
+        comb[randperm(rng, param_cnt)[1:(param_cnt - n_way)]] .= 0
+        @test sum(comb .!= 0) == n_way
+        found = false
+        for sidx in 1:size(coverage, 1)
+            if coverage[sidx, :] == comb
+                found = true
+            end
+        end
+        @test found
+    end
+end
+
+### coverage_by_paramter
+cbp_cases = [
+    [[0 0 0; 0 0 0; 0 1 0], 3, [0, 1, 0]],
+    [[0 0 0; 0 0 0; 0 1 0], 2, [0, 0, 0]],
+    [[0 0 7; 0 0 4; 0 1 0], 3, [0, 1, 2]]
+]
+for cbp_case in cbp_cases
+    res = coverage_by_parameter(cbp_case[1], cbp_case[2])
+    @test res == cbp_case[3]
+end
+
+### coverage_by_value
+
+cbv_cases = [
+    [[0 0 0; 0 0 0; 0 0 0], 3, [2,2,2], 1, [0, 0]],
+    [[0 0 0; 0 0 0; 0 0 0], 3, [2,2,2], 2, [0, 0]],
+    [[0 0 0; 0 0 0; 0 0 0], 3, [2,3,2], 2, [0, 0, 0]], # sees arity of choice
+    [[0 1 0; 0 1 0; 0 0 0], 3, [2,3,2], 2, [2, 0, 0]], # does multiple rows
+    [[0 1 0; 0 1 0; 0 3 0], 3, [2,3,2], 2, [2, 0, 1]], # does multiple columns
+    [[0 1 0; 0 1 0; 0 3 0], 2, [2,3,2], 2, [2, 0, 0]]  # excludes extra rows
+]
+for cbv_case in cbv_cases
+    res = coverage_by_value(cbv_case[1], cbv_case[2], cbv_case[3], cbv_case[4])
+    @test res == cbv_case[5]
+end
+
+### most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
+mmm_allc = [1 1 1 0 0; 1 2 1 0 0; 0 0 1 2 2]
+mmm_arity = [2, 2, 2, 2, 2]
+mmm_nway = 3
+mmm_cases = [
+    [[1, 0, 0, 0, 0], 2, [1, 1]],
+    [[1, 0, 0, 0, 0], 4, [0, 0]],
+    [[0, 0, 0, 0, 1], 2, [0, 0]],
+    [[0, 0, 0, 0, 1], 3, [0, 0]],
+    [[0, 0, 0, 0, 2], 3, [1, 0]],
+    [[1, 0, 0, 0, 0], 3, [2, 0]],
+    [[0, 0, 1, 0, 0], 1, [2, 0]],
+    [[1, 0, 1, 0, 0], 2, [1, 1]],
+    [[1, 1, 0, 0, 0], 3, [1, 0]],
+    [[1, 2, 0, 0, 0], 3, [1, 0]],
+    [[0, 0, 1, 0, 2], 4, [0, 1]]
+]
+for mmm_case in mmm_cases
+    res = most_matches_existing(mmm_allc, 3, mmm_arity, mmm_case[1], mmm_case[2], mmm_nway)
+    @test res == mmm_case[3]
+end
+
+### combination_number
+
+for cn_a in 1:6
+    for cn_b in 1:cn_a
+        @test combination_number(cn_a, cn_b) == factorial(cn_a) ÷ (factorial(cn_a - cn_b) * factorial(cn_b))
+    end
+end
+
+
+### add_coverage!(allc, row_cnt, n_way, entry)
+ac_cases = [
+    [[1 1 0; 1 2 0; 1 0 1; 1 0 2], 4, 2, [1, 1, 1], 2, [1 0 2; 1 2 0; 1 1 0; 1 0 1]],
+    [[1 1 0; 1 2 0; 1 0 1; 1 0 2], 3, 2, [1, 1, 1], 1, [1 2 0; 1 1 0; 1 0 1; 1 0 2]]
+]
+for ac_case in ac_cases
+    cover0 = copy(ac_case[1])
+    res = add_coverage!(cover0, ac_case[2], ac_case[3], ac_case[4])
+    @test res == ac_case[5]
+    println(cover0)
+    println(ac_case[6])
+    @test cover0 == ac_case[6]
+end
+
+
+### match_score
+ms_cases = [
+    [[1 1 0; 1 2 0; 0 1 3], 3, 2, [4,4,4], 0],
+    [[1 1 0; 1 2 0; 0 2 1; 0 1 3], 4, 2, [1,1,1], 1],
+    [[1 1 0; 1 2 0; 0 2 1; 0 1 3], 4, 2, [1,2,1], 2],
+    [[1 1 0; 1 2 0; 0 2 1; 0 1 3], 4, 2, [1,1,3], 2],
+    [[1 1 0; 1 2 0; 0 2 1; 0 1 3], 3, 2, [1,1,3], 1]
+]
+for ms_case in ms_cases
+    cnt = match_score(ms_case[1], ms_case[2], ms_case[3], ms_case[4])
+    @test cnt == ms_case[5]
+end
+
+
+### argmin_rand
+ar_cases = [
+    [[1,2,3,1,4], [1,4]],
+    [[-5, -7, -6, -3], [2]],
+    [[0, -1, -2, -2], [3, 4]],
+    [[1,1,1,1], [1,2,3,4]]
+]
+ar_rng = MersenneTwister(342234)
+for ar_case in ar_cases
+    values = Set{Int}()
+    for i in 1:10
+        idx = argmin_rand(ar_rng, ar_case[1])
+        push!(values, idx)
+    end
+    res = sort([x for x in values])
+    @test res == ar_case[2]
+end
+
+
+### n_way_coverage
+rng = Random.MersenneTwister(9234724)
+arity = [2,3,2,3]
+n_way = 2
+
+M = 50
+cover = n_way_coverage(arity, n_way, M, rng)
+
+n_way = 3
+cover = n_way_coverage(arity, n_way, M, rng)
