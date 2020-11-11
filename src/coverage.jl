@@ -1,4 +1,5 @@
 using Combinatorics: combinations
+using Random
 
 a = Set{NTuple{3,Int8}}()
 push!(a, (3, 7, 4))
@@ -77,23 +78,42 @@ end
 
 # These are combinations per possible value of each parameter.
 # For instance, [2,3,4]. it would be [7, 6, 5] for 2-way.
-function possible_combinations(n_way, param_size)
-    param_cnt = length(param_size)
-    combinations = zeros(Int, param_cnt)
+function combinations_per_value(arity, n_way)
+    param_cnt = length(arity)
+    per_value = zeros(Int, param_cnt)
     # param_keys = [NTuple{n_way,Int8}(x) for x in collect(Combinatorics.combinations(1:param_cnt, n_way))]
-    param_keys = [x for x in collect(Combinatorics.combinations(1:param_cnt, n_way))]
+    param_keys = [x for x in collect(combinations(1:param_cnt, n_way))]
     for comb_idx in 1:param_cnt
-        factor = param_size[comb_idx]
-        total = sum([prod(param_size[key_set]) / factor for key_set in param_keys if comb_idx in key_set])
-        combinations[comb_idx] = total
+        factor = arity[comb_idx]
+        total = sum([prod(arity[key_set]) / factor for key_set in param_keys if comb_idx in key_set])
+        per_value[comb_idx] = total
     end
-    combinations
+    per_value
 end
 
 function total_combinations(arity, n_way)
     param_cnt = length(arity)
     sum(prod(arity[key_set]) for key_set in combinations(1:param_cnt, n_way))
 end
+
+incoming_idx = 1
+bit_nonzero = seed[incoming_idx, :] .!= 0
+which_nonzero = (1:param_cnt)[bit_nonzero]
+idx = NTuple{n_way,Int8}(which_nonzero)
+values = NTuple{n_way,Int8}(seed[incoming_idx, bit_nonzero])
+push!(ad[idx], values)
+
+
+for incoming_idx in 1:size(seed, 1)
+    bit_nonzero = seed[incoming_idx, :] .!= 0
+    which_nonzero = (1:param_cnt)[bit_nonzero]
+    idx = NTuple{n_way,Int8}(which_nonzero)
+    values = NTuple{n_way,Int8}(seed[incoming_idx, bit_nonzero])
+    push!(ad[idx], values)
+end
+
+ad
+
 
 n_way = 2
 arity = Int[2,2,3,2,3]
@@ -180,23 +200,269 @@ function all_combinations(arity, n_way)
     coverage
 end
 
-all_combinations([2,3,2], 2)
 
-incoming_idx = 1
-bit_nonzero = seed[incoming_idx, :] .!= 0
-which_nonzero = (1:param_cnt)[bit_nonzero]
-idx = NTuple{n_way,Int8}(which_nonzero)
-values = NTuple{n_way,Int8}(seed[incoming_idx, bit_nonzero])
-push!(ad[idx], values)
-
-
-for incoming_idx in 1:size(seed, 1)
-    bit_nonzero = seed[incoming_idx, :] .!= 0
-    which_nonzero = (1:param_cnt)[bit_nonzero]
-    idx = NTuple{n_way,Int8}(which_nonzero)
-    values = NTuple{n_way,Int8}(seed[incoming_idx, bit_nonzero])
-    push!(ad[idx], values)
+function combination_histogram(allc, arity)
+    width = maximum(arity)
+    hist = zeros(Int, length(arity), width)
+    for row_idx in 1:size(allc, 1)
+        for col_idx in 1:width
+            if allc[row_idx, col_idx] > 0
+                hist[col_idx, allc[row_idx, col_idx]] += 1
+            end
+        end
+    end
+    hist
 end
 
-ad
 
+
+function most_to_cover(allc, row_cnt)
+   argmax(vec(sum(allc[1:row_cnt, :] .!= 0, dims = 1)))
+end
+
+function coverage_by_parameter(allc, row_cnt)
+    vec(sum(allc[1:row_cnt, :] .!= 0, dims = 1))
+end
+ 
+ 
+function coverage_by_value(allc, row_cnt, arity, param_idx)
+    hist = zeros(Int, arity[param_idx] + 1)
+    for row_idx in 1:row_cnt
+        hist[allc[row_idx, param_idx] + 1] += 1
+    end
+    hist[2:end]
+end
+
+function most_common_value(allc, row_cnt, arity, param_idx)
+    hist = zeros(Int, arity[param_idx] + 1)
+    for row_idx in 1:row_cnt
+        hist[allc[row_idx, param_idx] + 1] += 1
+    end
+    argmax(hist[2:end])
+end
+
+function most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
+    @assert existing[param_idx] == 0
+    param_cnt = length(arity)
+    params_known = min(sum(existing != 0), n_way - 1)
+    hist = zeros(Int, arity[param_idx])
+    for row_idx in 1:row_cnt
+        if allc[row_idx, param_idx] != 0
+            match_cnt = 0
+            for match_idx in 1:param_cnt
+                if existing[match_idx] != 0 && allc[row_idx, match_idx] == existing[match_idx]
+                    match_cnt += 1
+                end
+            end
+            if match_cnt == params_known
+                hist[allc[row_idx, param_idx]] += 1
+            end
+        end
+    end
+    hist
+end
+
+
+combination_number(n, m) = prod(n:-1:(n-n_way+1)) ÷ factorial(n_way)
+
+
+function pairs_in_entry(entry, n_way)
+    n = length(entry)
+    ans = zeros(Int, combination_number(n, n_way), n)
+    row_idx = 1
+    for param_idx in combinations(1:length(entry), n_way)
+        for col_idx in 1:n_way
+            ans[row_idx, param_idx[col_idx]] = entry[param_idx[col_idx]]
+        end
+        row_idx += 1
+    end
+    ans
+end
+
+
+function add_coverage!(allc, row_cnt, n_way, entry)
+    param_cnt = length(entry)
+
+    covers = zeros(Int, combination_number(param_cnt, n_way))
+    cover_cnt = 0
+    for row_idx in 1:row_cnt
+        match_cnt = 0
+        for match_idx in 1:param_cnt
+            if allc[row_idx, match_idx] == entry[match_idx]
+                match_cnt += 1
+            end
+        end
+        if match_cnt == n_way
+            cover_cnt += 1
+            covers[cover_cnt] = row_idx
+        end
+    end
+    for cover_idx in 1:cover_cnt
+        if row_cnt > 1
+            save = allc[row_cnt, :]
+            allc[row_cnt, :] = allc[covers[cover_idx], :]
+            allc[covers[cover_idx], :] = save
+            row_cnt -= 1
+        else
+            row_cnt -= 1
+        end
+    end
+    row_cnt
+end
+
+
+function match_score(allc, row_cnt, n_way, entry)
+    param_cnt = length(entry)
+    cover_cnt = 0
+    for row_idx in 1:row_cnt
+        param_match_cnt = 0
+        for match_idx in 1:param_cnt
+            if allc[row_idx, match_idx] == entry[match_idx]
+                param_match_cnt += 1
+            end
+        end
+        if param_match_cnt == n_way
+            cover_cnt += 1
+        end
+    end
+    cover_cnt
+end
+
+function argmin_rand(rng, v)
+    small = typemax(v[1])
+    small_extra_cnt = 0
+    small_idx = -1
+    for i in 1:length(v)
+        if v[i] < small
+            small = v[i]
+            small_extra_cnt = 0
+            small_idx = i
+        elseif v[i] == small
+            small_extra_cnt += 1
+        # else not the smallest.
+        end
+    end
+    if small_extra_cnt == 0
+        return small_idx
+    else
+        which = rand(rng, 1:(small_extra_cnt + 1))
+        which_cnt = 1
+        for s_idx in small_idx:length(v)
+            if v[s_idx] == small
+                if which_cnt == which
+                    return s_idx
+                end
+                which_cnt += 1
+            end
+        end
+    end
+    return 0
+end
+
+argmin_rand(rng, [1,2,3,0,5])
+argmin_rand(rng, [1,2,3,0,5, 0])
+# argmin_rand([], rng)
+
+n_way = 2
+M = 50
+arity = [2,3,2,3]
+allc = all_combinations(arity, n_way)
+remain = size(allc, 1)
+combination_histogram(allc, arity)
+combinations_per_value(arity, n_way)
+
+most_common_value(allc, remain, arity, 1)
+match_score(allc, remain, n_way, [1,1,1,1])
+
+existing = [1, 0, 0, 1]
+most_matches_existing(allc, remain, arity, existing, 2, 2)
+pairs_in_entry([1,3,7,5], 2)
+remain = add_coverage!(allc, remain, 2, [1,2,1,1])
+allc
+add_coverage!(allc, remain, 2, [1,2,1,2])
+
+n_way = 2
+M = 50
+arity = [2,3,2,3]
+allc = all_combinations(arity, n_way)
+remain = size(allc, 1)
+rng = Random.MersenneTwister(9234724)
+maximum_match_score = combination_number(param_cnt, n_way)
+param_cnt = length(arity)
+
+trials = zeros(Int, M, param_cnt)
+trial_scores = zeros(Int, M)
+params = zeros(Int, param_cnt)
+entry = zeros(Int, param_cnt)
+
+for trial_idx in 1:M
+    params[:] = 1:param_cnt
+    params[1] = most_to_cover(allc, remain)
+    params[params[1]] = 1
+    params[2:end] = shuffle(rng, params[2:end])
+
+    entry[:] .= 0
+    entry[params[1]] = most_common_value(allc, remain, arity, params[1])
+    for p_idx in 2:param_cnt
+        candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+        entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
+    end
+    score = match_score(allc, remain, n_way, entry)
+    trial_scores[trial_idx] = score
+    trials[trial_idx, :] = entry
+    if score == maximum_match_score
+        break
+    end
+end
+argmin_rand(rng, -trial_scores)
+
+function n_way_coverage(arity, n_way, M, rng)
+    param_cnt = length(arity)
+    allc = all_combinations(arity, n_way)
+    remain = size(allc, 1)
+    maximum_match_score = combination_number(param_cnt, n_way)
+    param_cnt = length(arity)
+
+    # Array of arrays.
+    coverage = Array{Array{Int64,1},1}()
+
+    trials = zeros(Int, M, param_cnt)
+    trial_scores = zeros(Int, M)
+    params = zeros(Int, param_cnt)
+    entry = zeros(Int, param_cnt)
+    
+    while remain > 0
+        params[:] = 1:param_cnt
+        param_coverage = coverage_by_parameter(allc, remain)
+        params[1] = argmin_rand(rng, -param_coverage)
+        params[params[1]] = 1
+        for trial_idx in 1:M    
+            params[2:end] = shuffle(rng, params[2:end])
+            entry[:] .= 0
+            candidate_params = coverage_by_value(allc, remain, arity, params[1])
+            entry[params[1]] = argmin_rand(rng, -candidate_params)
+            for p_idx in 2:param_cnt
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
+            end
+            score = match_score(allc, remain, n_way, entry)
+            trial_scores[trial_idx] = score
+            trials[trial_idx, :] = entry
+        end
+        chosen_idx = argmin_rand(rng, -trial_scores)
+        if trial_scores[chosen_idx] > 0
+            chosen_trial = trials[chosen_idx, :]
+            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            push!(coverage, chosen_trial)
+        end
+    end
+    coverage
+end
+
+
+rng = Random.MersenneTwister(9234724)
+arity = [2,3,2,3]
+n_way = 2
+
+M = 50
+n_way_coverage(arity, 2, M, rng)
