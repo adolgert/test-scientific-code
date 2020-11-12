@@ -216,3 +216,36 @@ This document covers two different kinds of failure-free faults.
 While these faults are within the taxonomy of faults
 in any book on testing, we can discuss some of the particular
 challenges that complicated mathematical functions introduce.
+
+
+
+\section{Statistics}
+
+Our tools to
+understand and interpret this experimental data fall into a
+few categories of \emph{statistical} tests.
+\begin{itemize}
+	\item A statistical test that a measure of the data matches
+	      a known value. We could ask whether the mean of the durations
+	      is what we expect from the construction of the function.
+
+	\item A statistical test of differences between two experiments.
+	      This could be a comparison of outputs from parturition
+	      for two different cattle breeds.
+
+	\item A statistical test to characterize the shape of an
+	      association. For instance, does the duration between
+	      births increase as weight increases?
+\end{itemize}
+For each of these kinds of statistical tests, there are a range of
+standard methods. We choose among those methods according to what
+our goals are for particular software tests.
+
+
+\begin{itemize}
+	\item Develop new code.
+	\item Unit test that code to ensure it isn't broken by a change.
+	\item Regression test when writing a new version of that code,
+	      either for refactoring or for a modification in function.
+	\item Acceptance test, or checkout test that code.
+\end{itemize}
