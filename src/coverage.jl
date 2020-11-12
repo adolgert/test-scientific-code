@@ -289,6 +289,9 @@ n-tuples would it now cover? `allc` is the matrix of n-tuples.
 `row_cnt` is the first set of rows, representing uncovered tuples.
 `n_way` is the length of each tuple. Entry is a set of putative
 paramter values. Returns an integer number of newly-covered tuples.
+
+This is a place to look into alternative algorithms. We could weight
+the match score by increasing the score for greater wayness.
 """
 function match_score(allc, row_cnt, entry)
     param_cnt = length(entry)
@@ -553,7 +556,7 @@ function n_way_coverage_multi(arity, allc, disallow, seed, M, rng)
     remain = size(allc, 1)
     before_disallow = size(allc, 1)
     allc = remove_combinations(allc, disallow)
-    
+
     # Array of arrays.
     coverage = Array{Array{Int64,1},1}()
 
