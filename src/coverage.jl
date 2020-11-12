@@ -119,7 +119,7 @@ end
 
 
 """
-    most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
+    most_matches_existing(allc, row_cnt, arity, existing, param_idx)
 
 There is a coverage array, and there is a list of existing choices for the
 values of parameters. This asks, given another parameter, how many matches
@@ -127,26 +127,30 @@ would each of its values produce, were it chosen. The return value is a
 vector where the first entry is the number of matches for value = 1, the second
 entry is number of matches for value = 2, and so on.
 """
-function most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
+function most_matches_existing(allc, row_cnt, arity, existing, param_idx)
     @assert existing[param_idx] == 0
     param_cnt = length(arity)
     # The match count can only be as large as n_way - 1 because the
     # column with the parameter is non-zero and will be zero in existing.
     # If n-way is 3 and we only know one parameter so far, that's another limit
     # to the possible match size.
-    # max_known = sum(existing .!= 0)
-    params_known = min(sum(existing .!= 0), n_way - 1)
+    max_known = sum(existing .!= 0)
+    # params_known = min(sum(existing .!= 0), n_way - 1)
     hist = zeros(Int, arity[param_idx])
     for row_idx in 1:row_cnt
         # The given parameter column is part of this match.
         if allc[row_idx, param_idx] != 0
             match_cnt = 0
+            n_way = 0
             for match_idx in 1:param_cnt
+                if allc[row_idx, match_idx] != 0
+                    n_way += 1
+                end
                 if existing[match_idx] != 0 && allc[row_idx, match_idx] == existing[match_idx]
                     match_cnt += 1
                 end
             end
-            if match_cnt == params_known
+            if match_cnt == min(max_known, n_way)
                 hist[allc[row_idx, param_idx]] += 1
             end
         end
@@ -203,7 +207,7 @@ end
 
 
 """
-    add_coverage!(allc, row_cnt, n_way, entry)
+    add_coverage!(allc, row_cnt, entry)
 
 The coverage matrix, `allc`, has `row_cnt` entries that are considered
 uncovered, and the rest have been covered already. This adds a new entry,
@@ -211,15 +215,19 @@ which is a complete set of parameter choices. For every parameter that's
 covered, this moves those to the end. It returns a new `row_cnt` which is
 the number of initial uncovered rows.
 """
-function add_coverage!(allc, row_cnt, n_way, entry)
+function add_coverage!(allc, row_cnt, entry)
     param_cnt = length(entry)
 
-    covers = zeros(Int, combination_number(param_cnt, n_way))
+    covers = zeros(Int, row_cnt)
     cover_cnt = 0
     # Find matches before reordering them to the end.
     for row_idx in 1:row_cnt
         match_cnt = 0
+        n_way = 0
         for match_idx in 1:param_cnt
+            if allc[row_idx, match_idx] != 0
+                n_way += 1
+            end
             if allc[row_idx, match_idx] == entry[match_idx]
                 match_cnt += 1
             end
@@ -340,7 +348,7 @@ function n_way_coverage(arity, n_way, M, rng)
             candidate_params = coverage_by_value(allc, remain, arity, params[1])
             entry[params[1]] = argmin_rand(rng, -candidate_params)
             for p_idx in 2:param_cnt
-                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx])
                 entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
             end
             score = match_score(allc, remain, n_way, entry)
@@ -351,7 +359,7 @@ function n_way_coverage(arity, n_way, M, rng)
         maximum_score = trial_scores[chosen_idx]
         if maximum_score > 0
             chosen_trial = trials[chosen_idx, :]
-            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            remain = add_coverage!(allc, remain, chosen_trial)
             push!(coverage, chosen_trial)
         else
             println("error because nothing was covered")
@@ -378,7 +386,7 @@ function n_way_coverage_init(arity, n_way, seed, M, rng)
     # Don't save the seeds to the coverage array because the user knows
     # what they are.
     for seed_idx in 1:size(seed, 1)
-        remain = add_coverage!(allc, remain, n_way, seed[seed_idx, :])
+        remain = add_coverage!(allc, remain, seed[seed_idx, :])
     end
 
     trials = zeros(Int, M, param_cnt)
@@ -399,7 +407,7 @@ function n_way_coverage_init(arity, n_way, seed, M, rng)
             candidate_params = coverage_by_value(allc, remain, arity, params[1])
             entry[params[1]] = argmin_rand(rng, -candidate_params)
             for p_idx in 2:param_cnt
-                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx])
                 entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
             end
             score = match_score(allc, remain, n_way, entry)
@@ -410,7 +418,7 @@ function n_way_coverage_init(arity, n_way, seed, M, rng)
         maximum_score = trial_scores[chosen_idx]
         if maximum_score > 0
             chosen_trial = trials[chosen_idx, :]
-            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            remain = add_coverage!(allc, remain, chosen_trial)
             push!(coverage, chosen_trial)
         else
             exhausted_by_filter = true
@@ -462,7 +470,7 @@ function n_way_coverage_filter(arity, n_way, disallow, seed, M, rng)
     # Don't save the seeds to the coverage array because the user knows
     # what they are.
     for seed_idx in 1:size(seed, 1)
-        remain = add_coverage!(allc, remain, n_way, seed[seed_idx, :])
+        remain = add_coverage!(allc, remain, seed[seed_idx, :])
     end
 
     trials = zeros(Int, M, param_cnt)
@@ -483,7 +491,7 @@ function n_way_coverage_filter(arity, n_way, disallow, seed, M, rng)
             candidate_params = coverage_by_value(allc, remain, arity, params[1])
             entry[params[1]] = argmin_rand(rng, -candidate_params)
             for p_idx in 2:param_cnt
-                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx])
                 entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
             end
             if !disallow(entry)
@@ -497,7 +505,7 @@ function n_way_coverage_filter(arity, n_way, disallow, seed, M, rng)
         chosen_trial = trials[chosen_idx, :]
         maximum_score = trial_scores[chosen_idx]
         if 0 < maximum_score
-            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            remain = add_coverage!(allc, remain, chosen_trial)
             push!(coverage, chosen_trial)
         # else Failure to cover can happen for a bad draw in the shuffle.
         end

@@ -81,10 +81,9 @@ for cbv_case in cbv_cases
     @test res == cbv_case[5]
 end
 
-### most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
+### most_matches_existing(allc, row_cnt, arity, existing, param_idx)
 mmm_allc = [1 1 1 0 0; 1 2 1 0 0; 0 0 1 2 2]
 mmm_arity = [2, 2, 2, 2, 2]
-mmm_nway = 3
 mmm_cases = [
     [[1, 0, 0, 0, 0], 2, [1, 1]],
     [[1, 0, 0, 0, 0], 4, [0, 0]],
@@ -99,7 +98,7 @@ mmm_cases = [
     [[0, 0, 1, 0, 2], 4, [0, 1]]
 ]
 for mmm_case in mmm_cases
-    res = most_matches_existing(mmm_allc, 3, mmm_arity, mmm_case[1], mmm_case[2], mmm_nway)
+    res = most_matches_existing(mmm_allc, 3, mmm_arity, mmm_case[1], mmm_case[2])
     @test res == mmm_case[3]
 end
 
@@ -112,14 +111,14 @@ for cn_a in 1:6
 end
 
 
-### add_coverage!(allc, row_cnt, n_way, entry)
+### add_coverage!(allc, row_cnt, entry)
 ac_cases = [
     [[1 1 0; 1 2 0; 1 0 1; 1 0 2], 4, 2, [1, 1, 1], 2, [1 0 2; 1 2 0; 1 1 0; 1 0 1]],
     [[1 1 0; 1 2 0; 1 0 1; 1 0 2], 3, 2, [1, 1, 1], 1, [1 2 0; 1 1 0; 1 0 1; 1 0 2]]
 ]
 for ac_case in ac_cases
     cover0 = copy(ac_case[1])
-    res = add_coverage!(cover0, ac_case[2], ac_case[3], ac_case[4])
+    res = add_coverage!(cover0, ac_case[2], ac_case[4])
     @test res == ac_case[5]
     println(cover0)
     println(ac_case[6])
