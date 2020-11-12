@@ -55,6 +55,10 @@ for ac_trial_idx in 1:5
     end
 end
 
+## multi_way_coverage
+mwc = multi_way_coverage([2,3,4,2,2,3], Dict(3 => [[1,4,4,5]]), 2)
+@test maximum(sum(mwc .!= 0, dims = 2)) == 3
+
 ### coverage_by_paramter
 cbp_cases = [
     [[0 0 0; 0 0 0; 0 1 0], 3, [0, 1, 0]],
@@ -135,7 +139,7 @@ ms_cases = [
     [[1 1 0; 1 2 0; 0 2 1; 0 1 3], 3, 2, [1,1,3], 1]
 ]
 for ms_case in ms_cases
-    cnt = match_score(ms_case[1], ms_case[2], ms_case[3], ms_case[4])
+    cnt = match_score(ms_case[1], ms_case[2], ms_case[4])
     @test cnt == ms_case[5]
 end
 
@@ -217,3 +221,24 @@ tuple_cnt = coverage_by_tuple(cover, n_way)
 
 cover = n_way_coverage_filter(arity, n_way, x -> x[3] == 1 && x[4] != 1, [], M, rng)
 n_way_coverage([4,4,4,4,4,4,4,4,4], 2, M, rng)
+
+
+### n_way_coverage_multi
+rng = MersenneTwister(789607)
+M = 50
+arity = [2,3,4,2,2,3]
+n_way = 2
+high_indices = [1,3,4,5]
+mwc = multi_way_coverage(arity, Dict(3 => [high_indices]), n_way)
+@test maximum(sum(mwc .!= 0, dims = 2)) == 3
+cov = n_way_coverage_multi(arity, mwc, x->false, [], M, rng)
+cov_mat = vcat([cv' for cv in cov]...)
+cov_high = cov_mat[:, high_indices]
+singles = unique(sort(cov_mat[:, high_indices], dims = 1), dims = 1)
+
+cov_high_list = [cov_high[idx, :] for idx in 1:size(cov_high, 1)]
+accumulated = tuples_in_trials(cov_high_list, 3)
+tuple_cnt = coverage_by_tuple(cov_high_list, 3)
+# This is it. The total number of 3-way tuples should match straight
+# count of combinations of the four items for 3-way.
+@test tuple_cnt == total_combinations(arity[high_indices], 3)
