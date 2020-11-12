@@ -1,5 +1,7 @@
 using Test
 
+include("../coverage.jl")
+
 ### total_combinations
 tc_trials = [
     [[2, 2, 2], 2, 12],

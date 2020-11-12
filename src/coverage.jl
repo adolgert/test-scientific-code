@@ -134,6 +134,7 @@ function most_matches_existing(allc, row_cnt, arity, existing, param_idx, n_way)
     # column with the parameter is non-zero and will be zero in existing.
     # If n-way is 3 and we only know one parameter so far, that's another limit
     # to the possible match size.
+    # max_known = sum(existing .!= 0)
     params_known = min(sum(existing .!= 0), n_way - 1)
     hist = zeros(Int, arity[param_idx])
     for row_idx in 1:row_cnt
@@ -494,8 +495,8 @@ function n_way_coverage_filter(arity, n_way, disallow, seed, M, rng)
         end
         chosen_idx = argmin_rand(rng, -trial_scores[1:trial_cnt])
         chosen_trial = trials[chosen_idx, :]
-        maximum_score = trial_scores[chosen_trial]
-        if maximum_score > 0
+        maximum_score = trial_scores[chosen_idx]
+        if 0 < maximum_score
             remain = add_coverage!(allc, remain, n_way, chosen_trial)
             push!(coverage, chosen_trial)
         # else Failure to cover can happen for a bad draw in the shuffle.
