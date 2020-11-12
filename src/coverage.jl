@@ -91,7 +91,7 @@ find how many times a nonzero appears in each column.
 function coverage_by_parameter(allc, row_cnt)
     vec(sum(allc[1:row_cnt, :] .!= 0, dims = 1))
 end
- 
+
 
 """
     coverage_by_value(allc, row_cnt, arity, param_idx)
@@ -172,6 +172,36 @@ end
 
 
 """
+    tuples_in_trials(trials, n_way)
+
+Find the number of distinct tuples in a set of trials. This uses a different method
+to count and store those tuples, as a check on other methods. It returns a dictionary
+where each key is the index of non-zero parameters and the value is the set of all
+ways those values appear.
+"""
+function tuples_in_trials(trials, n_way)
+    param_cnt = length(trials[1])
+    param_combo = [Tuple(x) for x in combinations(1:param_cnt, n_way)]
+    # The dictionary with keys = parameter indices and dictionary
+    # value is set of tuples of parameter values.
+    seen = Dict(x => Set{NTuple{n_way,Int}}() for x in param_combo)
+    for trial_idx in 1:length(trials)
+        entry = trials[trial_idx]
+        for params in param_combo
+            push!(seen[params], Tuple(entry[[x for x in params]]))
+        end
+    end
+    seen
+end
+
+
+function coverage_by_tuple(trials, n_way)
+    accumulated = tuples_in_trials(trials, n_way)
+    sum([length(aset) for aset in values(accumulated)])
+end
+
+
+"""
     add_coverage!(allc, row_cnt, n_way, entry)
 
 The coverage matrix, `allc`, has `row_cnt` entries that are considered
@@ -198,7 +228,6 @@ function add_coverage!(allc, row_cnt, n_way, entry)
             covers[cover_cnt] = row_idx
         end
     end
-    println("covers $covers, $row_cnt")
     # Given the matches, we can swap them to the end of the matrix.
     # Work from the end in case a match is near row_cnt.
     for cover_idx in cover_cnt:-1:1
@@ -319,11 +348,157 @@ function n_way_coverage(arity, n_way, M, rng)
         end
         chosen_idx = argmin_rand(rng, -trial_scores)
         maximum_score = trial_scores[chosen_idx]
-        println("score $maximum_score remain $remain")
         if maximum_score > 0
             chosen_trial = trials[chosen_idx, :]
             remain = add_coverage!(allc, remain, n_way, chosen_trial)
             push!(coverage, chosen_trial)
+        else
+            println("error because nothing was covered")
+        end
+        loop_idx += 1
+    end
+    coverage
+end
+
+
+
+function n_way_coverage_init(arity, n_way, seed, M, rng)
+    param_cnt = length(arity)
+    allc = all_combinations(arity, n_way)
+    # Every combination is nonzero.
+    @assert sum(sum(allc, dims = 2) == 0) == 0
+    remain = size(allc, 1)
+    maximum_match_score = combination_number(param_cnt, n_way)
+    param_cnt = length(arity)
+
+    # Array of arrays.
+    coverage = Array{Array{Int64,1},1}()
+
+    # Don't save the seeds to the coverage array because the user knows
+    # what they are.
+    for seed_idx in 1:size(seed, 1)
+        remain = add_coverage!(allc, remain, n_way, seed[seed_idx, :])
+    end
+
+    trials = zeros(Int, M, param_cnt)
+    trial_scores = zeros(Int, M)
+    params = zeros(Int, param_cnt)
+    entry = zeros(Int, param_cnt)
+    
+    exhausted_by_filter = false
+    loop_idx = 1
+    while remain > 0 || exhausted_by_filter
+        params[:] = 1:param_cnt
+        param_coverage = coverage_by_parameter(allc, remain)
+        params[1] = argmin_rand(rng, -param_coverage)
+        params[params[1]] = 1
+        for trial_idx in 1:M
+            params[2:end] = shuffle(rng, params[2:end])
+            entry[:] .= 0
+            candidate_params = coverage_by_value(allc, remain, arity, params[1])
+            entry[params[1]] = argmin_rand(rng, -candidate_params)
+            for p_idx in 2:param_cnt
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
+            end
+            score = match_score(allc, remain, n_way, entry)
+            trial_scores[trial_idx] = score
+            trials[trial_idx, :] = entry
+        end
+        chosen_idx = argmin_rand(rng, -trial_scores)
+        maximum_score = trial_scores[chosen_idx]
+        if maximum_score > 0
+            chosen_trial = trials[chosen_idx, :]
+            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            push!(coverage, chosen_trial)
+        else
+            exhausted_by_filter = true
+        end
+        loop_idx += 1
+    end
+    coverage
+end
+
+
+function remove_combinations(allc, disallow)
+    allow_cnt = 0
+    allowed = zeros(Int, size(allc, 1))
+    for i in 1:size(allc, 1)
+        if !disallow(allc[i, :])
+            allow_cnt += 1
+            allowed[allow_cnt] = i
+        # else disallowed
+        end
+    end
+    allc[allowed[1:allow_cnt], :]
+end
+
+
+function arguments_to_arity(arguments)
+    [length(x) for x in arguments]
+end
+
+
+function indices_to_arguments(arguments, indices)
+    Tuple(arguments[i[1]][i[2]] for i in zip(1:length(indices), indices))
+end
+
+
+function n_way_coverage_filter(arity, n_way, disallow, seed, M, rng)
+    param_cnt = length(arity)
+    allc = all_combinations(arity, n_way)
+    # Every combination is nonzero.
+    @assert sum(sum(allc, dims = 2) == 0) == 0
+    before_disallow = size(allc, 1)
+    allc = remove_combinations(allc, disallow)
+    remain = size(allc, 1)
+    maximum_match_score = combination_number(param_cnt, n_way)
+    param_cnt = length(arity)
+
+    # Array of arrays.
+    coverage = Array{Array{Int64,1},1}()
+
+    # Don't save the seeds to the coverage array because the user knows
+    # what they are.
+    for seed_idx in 1:size(seed, 1)
+        remain = add_coverage!(allc, remain, n_way, seed[seed_idx, :])
+    end
+
+    trials = zeros(Int, M, param_cnt)
+    trial_scores = zeros(Int, M)
+    params = zeros(Int, param_cnt)
+    entry = zeros(Int, param_cnt)
+    
+    loop_idx = 1
+    while remain > 0
+        params[:] = 1:param_cnt
+        param_coverage = coverage_by_parameter(allc, remain)
+        params[1] = argmin_rand(rng, -param_coverage)
+        params[params[1]] = 1
+        trial_cnt = 0
+        while trial_cnt < M
+            params[2:end] = shuffle(rng, params[2:end])
+            entry[:] .= 0
+            candidate_params = coverage_by_value(allc, remain, arity, params[1])
+            entry[params[1]] = argmin_rand(rng, -candidate_params)
+            for p_idx in 2:param_cnt
+                candidate_values = most_matches_existing(allc, remain, arity, entry, params[p_idx], n_way)
+                entry[params[p_idx]] = argmin_rand(rng, -candidate_values)
+            end
+            if !disallow(entry)
+                trial_cnt += 1
+                score = match_score(allc, remain, n_way, entry)
+                trial_scores[trial_cnt] = score
+                trials[trial_cnt, :] = entry
+            end
+        end
+        chosen_idx = argmin_rand(rng, -trial_scores[1:trial_cnt])
+        chosen_trial = trials[chosen_idx, :]
+        maximum_score = trial_scores[chosen_trial]
+        if maximum_score > 0
+            remain = add_coverage!(allc, remain, n_way, chosen_trial)
+            push!(coverage, chosen_trial)
+        # else Failure to cover can happen for a bad draw in the shuffle.
         end
         loop_idx += 1
     end
