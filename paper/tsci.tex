@@ -858,6 +858,8 @@ even though it will always remain a fundamentally different function.
 
 \section{Choosing parameter values to test}\label{sec:parameter-logic}
 
+
+
 \subsection{Decision tables}\label{sec:parameter-decision}\index{decision table}
 
 A unit test is all about what parameters go in and what result
@@ -868,7 +870,7 @@ parameters and what you expect as a result.
 
 Let's say, for our scientific code, that we can figure out what the result
 should be, for any set of input parameters. This isn't always
-possible, which is a problem we can discuss later, but assume
+possible, but assume
 for now that we have a way to know what the answer should be.
 
 Decision tables capture the clarity of what-goes-in paired
@@ -901,7 +903,7 @@ $x_0$ & 5 & exponential & linear & 3 & [2.1, 2.15, 2.18] \\
 $x_0$ & 5 & exponential & logarithmic & 2 & [2.31, 2.4, 2.47] \\ \hline
 \end{tabular}
 \end{center}
-The table gives a good look at what tests we will run, and code
+The table gives a good look at what tests we will run, and testing code
 that uses the same technique is just as clear.
 
 \begin{lstlisting}
@@ -934,8 +936,82 @@ We can see that, even for this small case, the list of tests
 will be long, because we would want to probe the possible problems
 with $x$ for each combination of kernel and transform.
 We need to decide which parameter sets to test
-and how many are enough, and equivalence classes are an approach
-to this question.
+and how many are enough. How do we make these choices?
+
+
+\subsection{Specification and Coverage}
+
+\begin{quotation}
+I know there’s some move I could make---the right word, attitude, plan---but these are all just tricks. These are all just things I would think up and try. So let’s forgo that. Let’s assume that whatever that thing is, that whatever it is that would make you stay, has occurred, that it has happened, and that my hand has already gone down your throat, and grabbed your heart, and squoze it. [L.A. Story]
+\end{quotation}
+
+Talking so much about how to test code can feel paranoiac.
+We're looking for an edge to find the right questions to ask
+of the code, such that it will divulge its flaws.
+I'd like to look at this process more as conscious forethought
+that brings comfort with limited effort.
+
+In this case, we're going to choose a few test cases among
+the plethora imaginable. When we make those choices, we begin
+by asking what we know about the code and how we will measure,
+and observe, success.
+
+Some of the best tests come from not reading the code.
+Instead, we read the equations that code is supposed to represent.
+These constitute what an engineer calls a specification,
+but they should lay bare the mathematical pitfalls, our
+divide-by-zero problems, the places where a factorial
+could be too large to represent with an integer.
+
+The usual path is to look at the code. Each condition in
+an if--then can be a place to test. We look for hotspots,
+such as long equations or nested loops with fancy indexing.
+Some parts of the code seem impossible to get wrong, so we
+test those lightly. Others raise flags, so we focus on all the
+ways we may have erred in their construction.
+
+There is more help beyond reading the code and making
+guesses. We can measure success. The ultimate measure
+of success is finding bugs. On a larger, project level,
+there are ways to record the rate of finding bugs, the kinds
+of bugs, and where they are. These methods are out of scope
+of this discussion but are clearly useful.
+
+During construction of tests, we can measure success by
+measuring how the test cover the code. That is, how much of
+the code is run by the tests? How much of the behavior in the
+code do these tests exercise?
+
+We could ensure that each line of code in the function is
+run by at least one unit test. That's called statement coverage.
+We could further fine-grain that to ensure that every branch
+in the code is taken by at least one unit test. That's
+branch coverage. Both of these are kinds of code coverage.
+
+Some math code doesn't have any if--then statements. Path
+dependence wouldn't matter as much in this case.
+
+Before we construct tests, we decide whether to work from
+the specification or implementation (or each, one at a time).
+We decide how to measure test coverage.
+
+
+
+XXX They're both incomplete representations of how state and execution
+lead to failure in code.
+
+XXX When I choose equivalence classes, I can start by reading
+the code. Defining equivalence classes by code coverage is
+exactly the same as reading code for path dependencies.
+I can also start by reading the specification or requirements
+document, were those to exist. For scientific code,
+it can help to read the math this code represents.
+A parameter of 3.0 and 3.5 might not be equivalent if they
+represent radians. Floating-point types only make this
+more complicated.
+
+
+
 
 \subsection{Equivalence classes}\label{sec:limits}\index{equivalence class}
 
@@ -957,14 +1033,6 @@ then another in the same equivalence class would find the same
 failure. Think of this as taking the set of all possible
 combinations of parameters and partitioning them. It's a reasonable
 way to choose test parameters and impossible to do correctly.
-
-We could ensure that each line of code in the function is
-run by at least one unit test. That's called statement coverage.
-We could further fine-grain that to ensure that every branch
-in the code is taken by at least one unit test. That's
-branch coverage. Both of these are kinds of code coverage.
-They're both incomplete representations of how state and execution
-lead to failure in code.
 
 If we are constructing tests by hand, we choose which parameter
 sets to test by using a mental model of which sets cover the same
@@ -1001,16 +1069,6 @@ to the risk associated with these parameter values. I'm
 giving them a separate equivalence class in order to ensure
 that there is some coverage of these cases. That was
 step two.
-
-When I choose equivalence classes, I can start by reading
-the code. Defining equivalence classes by code coverage is
-exactly the same as reading code for path dependencies.
-I can also start by reading the specification or requirements
-document, were those to exist. For scientific code,
-it can help to read the math this code represents.
-A parameter of 3.0 and 3.5 might not be equivalent if they
-represent radians. Floating-point types only make this
-more complicated.
 
 \subsubsection{Mathematical parameters}
 
