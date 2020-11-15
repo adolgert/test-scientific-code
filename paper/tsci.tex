@@ -863,8 +863,8 @@ even though it will always remain a fundamentally different function.
 A unit test is all about what parameters go in and what result
 comes out. There is setup of variables and
 parameters, which can be complicated. Checking the result can
-require twists and turns, but unit tests reduce to parameters and
-result.
+require twists and turns, but unit tests reduce to how you choose
+parameters and what you expect as a result.
 
 Let's say, for our scientific code, that we can figure out what the result
 should be, for any set of input parameters. This isn't always
@@ -874,67 +874,68 @@ for now that we have a way to know what the answer should be.
 Decision tables capture the clarity of what-goes-in paired
 with what-comes-out. They have one row per test with one
 column per input or output. It sounds simple, but it
-really makes code clear to use exactly that, a formatted
+makes code clear to use exactly that, a formatted
 table in a unit test.
 
 For instance, consider a function that projects a time series
-using the trend of its running average. It could use the slope
-of the last $m$ entries in the time series.
+using the trend of its running average. It would have some parameters.
+The time series is a
+vector in $x$. The function could use the slope
+of the last $m$ entries in the time series. Instead of weighting
+each of the $m$ values evenly, it would use an exponential or
+Weibull kernel to weight them. It might also
+transform the $x$ values according to a logarithm or exponential
+before projecting them. Lastly, it would need to know the range
+of how far out to project.
 \begin{lstlisting}
-def trend_predict(x, m, kernel, transform, range)
+trend_predict(x, m, kernel, transform, range) = ...
 \end{lstlisting}
-It could weight
-those last $m$ entries according to an exponential or Gaussian, so that
-earlier entries count less. It could transform the entries
-into log-space before projecting them. These options
-($m$, kernel, transform, and range) create
+These options, ($m$, kernel, transform, and range), create
 sets of allowed parameters.
 \begin{center}
-\begin{tabular}{|l|l|l|l|l|l|}\hline
+\begin{tabular}{|l|l|l|l|l||l|}\hline
 $x$ & $m$ & kernel & transform & range & output \\ \hline
-$x_0$ & 5 & Gaussian & linear & 1.0 & 2.7 \\
-$x_0$ & 5 & Gaussian & logarithmic & 2.0 & 1.9 \\
-$x_0$ & 5 & exponential & linear & 3.0 & 2.8 \\
-$x_0$ & 5 & exponential & logarithmic & 2.0 & 2.1 \\ \hline
+$x_0$ & 5 & Weibull & linear & 1 & [2.3] \\
+$x_0$ & 5 & Weibull & logarithmic & 2 & [2.4, 2.9] \\
+$x_0$ & 5 & exponential & linear & 3 & [2.1, 2.15, 2.18] \\
+$x_0$ & 5 & exponential & logarithmic & 2 & [2.31, 2.4, 2.47] \\ \hline
 \end{tabular}
 \end{center}
-We can see that, even for
-this small case, the list will be long. The example
-above doesn't even begin to probe error conditions, such
-as negative $m$ values or $m$ greater than the length
-of the data. For the time series itself, we could imagine
-a lot of time series that might be different in some way,
-if they were negative values or all the same value.
-
-We need to decide which parameter sets to test
-and how many are enough.
+The table gives a good look at what tests we will run, and code
+that uses the same technique is just as clear.
 
 \begin{lstlisting}
-import pytest
-from cascade.input_data.db.data_iterator import grouped_by_count
-
-@pytest.mark.parametrize("in_string,count", [
-    (list(range(11)), 5),
-    (list(range(10)), 5),
-    (list(range(9)), 5),
-    (list(), 5),
-    ([chr(x + ord("a")) for x in range(23)], 7),
-])
-def test_grouped_by_count_happy(in_string, count):
-    result = list()
-    total = set()
-    under = 0
-    for group in grouped_by_count(in_string, count):
-        result.extend(group)
-        total |= set(group)
-        assert len(group) <= count
-        assert len(group) > 0
-        if len(group) < count:
-            under += 1
-    assert len(total) == len(result)
-    assert len(total) == len(in_string)
-    assert under <= 1
+x0 = [1.7, 1.9, 1.8, 1.4, 1.3, 1.4]
+trend_trials = [
+    [x0, 5, :weibull, :linear, 1, [2.33]],
+    [x0, 5, :weibull, :log, 2, [2.47, 2.90]],
+    [x0, 5, :exponential, :linear, 3, [2.10, 2.15, 2.18]],
+    [x0, 5, :exponential, :log, 2, [2.31, 2.40, 2.47]],
+]
+for trial in trend_trials
+    args = trial[1:5]
+    result = trend_predict(args...)
+    @test all(result - trial[6] < 0.01)
+end
 \end{lstlisting}
+
+These four test cases don't begin to cover all possible inputs,
+but they do cover all combinations of kernel and transform.
+Without seeing the code for \lstinline|trend_predict()|, what
+other concerns might you have?
+
+There could be an off-by-one
+error in $m$, so it could be taking the last 4 or 6 elements
+when it should use the last 5. It could have problems with
+negative values, or very small values, of $x$. It could have
+a divide-by-zero problem if all values in $x$ were the same.
+
+We can see that, even for this small case, the list of tests
+will be long, because we would want to probe the possible problems
+with $x$ for each combination of kernel and transform.
+We need to decide which parameter sets to test
+and how many are enough, and equivalence classes are an approach
+to this question.
 
 \subsection{Equivalence classes}\label{sec:limits}\index{equivalence class}
 
@@ -950,49 +951,42 @@ def test_grouped_by_count_happy(in_string, count):
 % 
 % If everything in a partition fails, it is "homogeneous."
 
-The tools we discuss here will help us with the three steps
-we take to choose which parameters to test.
-
-\begin{enumerate}
-  \item Define which parameters could break the function in different ways.
-
-  \item Assign a probability to each set of parameters.
-
-  \item Choose an order in which to test some, or all, of those
-   parameters.
-\end{enumerate}
-
-\noindent{}These three steps will help us focus our testing
-where we see the most risk, and they start with identifying
-equivalence classes.
-
 Equivalence classes are sets of parameters that test the same
 parts of the function. If one of them would find a failure,
 then another in the same equivalence class would find the same
-failure. That's a reasonable way to partition test parameters
-and impossible to do in practice.
+failure. Think of this as taking the set of all possible
+combinations of parameters and partitioning them. It's a reasonable
+way to choose test parameters and impossible to do correctly.
 
 We could ensure that each line of code in the function is
 run by at least one unit test. That's called statement coverage.
 We could further fine-grain that to ensure that every branch
 in the code is taken by at least one unit test. That's
 branch coverage. Both of these are kinds of code coverage.
-They're both incomplete representations of equivalence classes
-in code and, in practice, we often think only of statement
-coverage.
+They're both incomplete representations of how state and execution
+lead to failure in code.
 
+If we are constructing tests by hand, we choose which parameter
+sets to test by using a mental model of which sets cover the same
+possible problems in the code. It's a guess that can be wrong,
+but we will discuss mitigation later.
 Take the example above, and list equivalence classes for each parameter.
+Here, we'll include test cases that include expected failures.
 \begin{center}
 \begin{tabular}{|l|l|l|}\hline
 parameter & \# classes & classes \\
 $x$ & 5 & positive, non-positive, constant, linear, very noisy \\
 $m$ & 5 & negative, 0, less than data, equal to data, more than data \\
 kernel & 2 & Gaussian, exponential \\
-range & 4 & negative, 0, positive, longer than $x$ \\
-transform & 2 & linear, logarithmic \\ \hline
+transform & 2 & linear, logarithmic \\
+range & 4 & negative, 0, shorter than $x$, longer than $x$ \\ \hline
 \end{tabular}
 \end{center}
-That makes $5\times 5 \times 2 \times 4\times 2 = 400$ cases.
+I listed five classes for the time series $x$. There are an infinite
+number of possible time series, but I guess that testing
+$x=(1.1, 1.1, 1.1, 1.1)$ is equivalent to testing
+$x=(3.7, 3.7, 3.7, 3.7)$.
+Even so, that makes $5\times 5 \times 2 \times 4\times 2 = 400$ cases.
 By defining a limited number of equivalence classes for
 each parameter, we have reduce the total number of unit tests
 from infinite to 400, but that's still a lot.
@@ -1335,6 +1329,8 @@ dynamic symbolic execution\index{dynamic symbolic execution} techniques. Microso
 includes this capability, but the tools are uncommon on
 Linux and for most languages.
 
+
+\subsection{Coverage}
 
 \subsection{Conclusion}
 
