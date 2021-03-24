@@ -1956,6 +1956,12 @@ look at how alternative choices probe faults in code.
 
 \section{Testing traits of a function}
 
+\subsection{Optimize for Error}
+
+Run an optimization where it maximizes the ratio of error comparing an approximation to the actual.
+
+Use alternating-directions method, aka coordinate search method. Or Nelder-Mead.
+
 \subsection{Measuring closeness}
 
 If I want to test whether $a$ and $b$ are close to each other,
@@ -2817,6 +2823,29 @@ developer by writing \textsc{crud} assertions in English.
 Then we can write tests that verify these \textsc{crud} requirements for
 each of the 576 kinds of inputs.
 
+
+
+\section{Accurate Arithmetic}\label{sec:accurate-arithmetic}
+
+\subsection{Interval analysis}
+You can write computations that are super careful. Interval analysis, interval arithmetic, can express uncertainty in input data. You can use this to write code that always carefully calculates a value. You can use it another way, to test that code will calculate a value when running on regular floating point. You need generic code for this. There is a version of interval arithmetic that tracks computational error for single values. It's pessimistic because it won't see beneficial cancelation. Higham's book. Tucker's Validated Numerics.
+
+If the interval arithmetic is too pessimistic, you can run it again with greater precision in the interval calculations in order to obtain a more precise bound. (Kahan06)
+
+Pessimistic: There is no additive or multiplicative inverse in interval arithmetic (Higham). And it produces a box in coordinate axes when uncertainty may have smaller bounds.
+
+Requires algorithms designed for purpose.
+
+Iteration makes intervals wider.
+\begin{equation}
+  |f_x(2_x) - f_2(x_2\pm \epsilon_2)| \ge |f'_2(x_2)|\epsilon_2.
+\end{equation}
+Each step increases the interval by at least the condition number. (Higham)
+
+
+\subsection{Stochastic arithmetic}
+
+You can use similar techniques to test floating point code. There is instrumentation that watches floating point in order to detect catastrophic cancelation.
 
 
 
