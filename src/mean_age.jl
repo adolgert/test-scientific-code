@@ -13,6 +13,7 @@ function constant_mortality_mean_age_corrected(mx, nx, boundary = 1e-6)
     result
 end
 
+
 function constant_mortality_mean_age(mx::Vector{T}, nx) where {T}
     expx = exp.(-mx .* nx)
     (one(T) ./ mx) .- (nx .* expx) ./ (one(T) .- expx)
@@ -20,12 +21,12 @@ end
 
 
 # The Langevin function is coth(x) - 1/x
-function langevin(x)
-    x / 3 / (
-        1 + x^2 / 15 / (
-            1 + x^2 / 35 / (
-                1 + x^2 / 63 / (
-                    1 + x^2 / 99
+function langevin(x::T) where {T}
+    x / T(3) / (
+        one(T) + x^2 / T(15) / (
+            one(T) + x^2 / T(35) / (
+                one(T) + x^2 / T(63) / (
+                    one(T) + x^2 / T(99)
                 )
             )
         )
@@ -33,8 +34,8 @@ function langevin(x)
 end
 
 
-function langevin_mean_age(mx, nx)
-    (nx / 2) .* (1 .- langevin.(mx .* nx / 2))
+function langevin_mean_age(mx::Vector{T}, nx) where {T}
+    (nx / T(2)) .* (one(T) .- langevin.(mx .* nx / T(2)))
 end
 
 
