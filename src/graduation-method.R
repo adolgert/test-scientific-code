@@ -3,6 +3,7 @@ mean_age_naive <- function(mx, nx) {
   (1 / mx) - (nx * expx) / (1 - expx)
 }
 
+
 mean_age_taylor <- function(mx, nx) {
   mn <- mx * nx
   (nx / 2) * (1 - mn / 6 * (1 - mn**2 / 60))

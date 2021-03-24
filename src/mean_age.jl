@@ -13,9 +13,9 @@ function constant_mortality_mean_age_corrected(mx, nx, boundary = 1e-6)
     result
 end
 
-function constant_mortality_mean_age(mx, nx)
+function constant_mortality_mean_age(mx::Vector{T}, nx) where {T}
     expx = exp.(-mx .* nx)
-    (1 ./ mx) .- (nx .* expx) ./ (1 .- expx)
+    (one(T) ./ mx) .- (nx .* expx) ./ (one(T) .- expx)
 end
 
 
