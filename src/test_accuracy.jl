@@ -2,7 +2,8 @@
 Given a function, what are some automated tests of the numerical accuracy
 of that function? This file looks at applying a set of methods to an example.
 """
-
+using IntervalArithmetic
+using StaticArrays
 
 # 1) Compare with a version using greater precision.
 mxs = ["1", "3", "100", "0.1", "0.01", "0.001", "0.0001", "0.00001", "0.000001"]
@@ -40,7 +41,6 @@ absdiff = vec(maximum(rounded; dims = 1) -  minimum(rounded; dims = 1))
 
 
 # 3) Run with interval arithmetic.
-using IntervalArithmetic
 mxs = ["1", "3", "100", "0.1", "0.01", "0.001", "0.0001", "0.00001", "0.000001"]
 iaorder = zeros(Interval{Float64}, length(mxs))
 for (mxidx, mx) in enumerate(mxs)
@@ -146,3 +146,47 @@ julia> results = Evolutionary.optimize(cm_error_arr, lower, upper, x0, ga)
     Iterations:    12
     f(x) calls:    1301
 """
+
+using StaticArrays
+const bigvals = SVector(
+    BigFloat("3"), BigFloat("15"), BigFloat("35"), BigFloat("63"), BigFloat("99"))
+
+function typish(x::T) where {T}
+    three = parse(T, "3")
+    three * x
+end
+
+
+function lackish(x::T) where {T}
+    three = T(3)
+    three * x
+end
+
+function prish(x::BigFloat)
+    bigvals[1] * x
+end
+
+
+# Will there be trouble with calculating life expectancy? Maybe
+# from multiplying conditional survival so many times?
+const _ql = SVector(
+    BigFloat("1"), BigFloat("2"), BigFloat("115"), BigFloat("0")
+)
+
+S(x) = max((115 - x) / 115, 0)
+S(x::BigFloat) = max((_ql[3] - x) / _ql[3], _ql[4])
+S(x, y) = S(y) / S(x)
+
+function survival(x, n)
+    p = one(x)
+    stops = LinRange(zero(x), x, n + 1)
+    for i in 1:n
+        p *= S(stops[i], stops[i + 1])
+    end
+    p
+end
+
+s64 = survival(114, 100 * 52)
+sbig = survival(BigFloat("114"), 100 * 52)
+@assert -log2((s64 - sbig) / sbig) > 56
+@assert -log2((s64 - sbig) / sbig) < 57
