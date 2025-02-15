@@ -200,10 +200,21 @@ let's assess here the risks that are unigue to scientific code.
 Let's look at how the tools we already know can address those risks
 and how some new tools might help when the stakes are high.
 
+
 \subsection{Functional Testing is the Scope}
+
+So many things can go wrong in so many ways.
 \begin{itemize}
-    \item Not other qualities.
-    \item Excluding software engineering questions.
+    \item Sometimes the results of a mathematical equation apply to people's jobs, justice, or health. A model can behave in ways that aren't ethical.
+    \item A calculation created for one situation can be used in another situation. This is the kind of failure that lead to stock market crashes.
+    \item Parameters to an equation can be wrong, so that they are in the wrong units or misapplied.
+\end{itemize}
+Those problems can be arranged in a stack, from application of a calculation, to conception of a model, to creation of a model, to implementation of a model. I want to go to the bottom of that stack, the part that seems the least error-prone, because that's more than enough complication to be wrong. And wrong all the time.
+
+We're going to ratchet down to a very focused part of the problem.
+\begin{itemize}
+    \item Not other qualities, such as usability, security, mutability.
+    \item Excluding software engineering questions such as how to make mocks, how to test multi-threaded or distributed software.
 \end{itemize}
 
 
@@ -367,6 +378,8 @@ helps us read it. There are only three was we find problems
 in code. We read it during code reviews, we test it, or we run it on
 real world problems. The first two rely on reading code well,
 and the third is the definition of failure.
+
+Control Flow Analysis by Frances E Allen, 1970 July, SIGPLAN Notices.
 
 \subsection{Code paths}\label{sec:code-paths}
 
@@ -614,6 +627,22 @@ integers are continuous values, but they can represent values that are
 sufficiently-close to every real value between some large negative number
 to some large positive number.
 
+\begin{table}
+\begin{tabular}{lllll}
+Value & Hexadecimal value & Sign & Fraction & Exponent \\
+0 &&&& \\
+1 &&&& \\
+-1 &&&& \\
+0.125 &&&& an exact representation\\
+0.1 &&&& not representable\\
+Signaling NaN &&&& \\
+Quiet NaN &&&& \\
+Inf &&&& \\
+-Inf &&&&
+\end{tabular}
+\caption{Sample double values. The hexadecimal value is colored by sign, fraction, and exponent.}
+\end{table}
+
 Floating-point types represent more than just real numbers, though. They
 also take the value $-\infty$ and $\infty$. In order to represent the inverse
 of these values, floating-point encodes both $0$ and $-0$, so that $1/(1 / -\infty)=-\infty$.
@@ -640,6 +669,7 @@ have been known to sneak a birth date in there.
 The \nan value is designed to fail silently but visibly. It plays
 a crucial role in how floating-point is supposed to fail gracefully.
 
+Parity flags.
 
 \subsection{Floating point exceptions}
 
@@ -700,6 +730,14 @@ def test_sqrt_negative_is_nan():
 The risk is that some part of the software stack, from Pandas to Python, from
 Windows to someone else's installation of Windows,
 will make some choice that changes the behavior that I see today.
+
+In practice, you decide exception checking through the runtime:
+\begin{itemize}
+    \item libc ieeefp.h, gnu fpu_control.h, and float.h, a little old school.
+    \item fenv.h for gcc, clang. feclearexcept(), feenableexcept(), fedisableexcept(), "man 3 fetestexcept"
+    \item or gsl_ieee_utils.h \url{https://www.gnu.org/software/gsl/doc/html/ieee754.html}.
+    \item _control87, _controlfp, _controlfp_s from Microsoft. \url{https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/controlfp-s?view=msvc-170}
+\end{itemize}
 
 
 \subsection{When are floats equal?}
